@@ -7,11 +7,11 @@ export default defineEventHandler(async (event) => {
 
   const id = Number(event.context.params?.id)
 
-  const category = await prisma.category.findUnique({ where: { id } })
-  if (!category || category.userId !== user.id) {
-    throw createError({ statusCode: 404, message: 'Categoría no encontrada' })
+  const creditCard = await prisma.creditCard.findUnique({ where: { id } })
+  if (!creditCard || creditCard.userId !== user.id) {
+    throw createError({ statusCode: 404, message: 'Tarjeta no encontrada' })
   }
 
-  await prisma.category.delete({ where: { id } })
-  return { message: 'Categoría eliminada' }
+  await prisma.creditCard.delete({ where: { id } })
+  return { message: 'Tarjeta eliminada' }
 })

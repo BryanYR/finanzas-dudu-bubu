@@ -7,10 +7,14 @@ export default defineEventHandler(async (event) => {
 
   const body = await readBody(event)
 
-  return prisma.category.create({
+  return prisma.savingsGoal.create({
     data: {
       name: body.name,
-      type: body.type,
+      targetAmount: body.targetAmount,
+      currentAmount: body.currentAmount || 0,
+      deadline: body.deadline ? new Date(body.deadline) : null,
+      priority: body.priority || 1,
+      description: body.description,
       userId: user.id,
     },
   })

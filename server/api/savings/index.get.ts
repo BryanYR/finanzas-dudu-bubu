@@ -5,13 +5,14 @@ export default defineEventHandler(async (event) => {
   const user = await getUserFromSession(event)
   if (!user) throw createError({ statusCode: 401 })
 
-  const body = await readBody(event)
-
-  return prisma.category.create({
-    data: {
-      name: body.name,
-      type: body.type,
-      userId: user.id,
+  return prisma.savingsGoal.findMany({
+    where: { userId: user.id },
+    include: {
+      contributions: {
+        orderBy: { date: 'desc' },
+        take: 5,
+      },
     },
+    orderBy: [{ isCompleted: 'asc' }, { priority: 'asc' }],
   })
 })

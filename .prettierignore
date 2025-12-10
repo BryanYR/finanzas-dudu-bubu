@@ -1,0 +1,23 @@
+# Dependencies
+node_modules
+
+# Build outputs
+.nuxt
+.output
+dist
+.nitro
+
+# Env files
+.env
+.env.*
+
+# Lock files
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Prisma generated files
+prisma/migrations
+
+# Logs
+*.log

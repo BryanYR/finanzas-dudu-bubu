@@ -7,10 +7,16 @@ export default defineEventHandler(async (event) => {
 
   const body = await readBody(event)
 
-  return prisma.category.create({
+  return prisma.creditCard.create({
     data: {
       name: body.name,
-      type: body.type,
+      bank: body.bank,
+      lastDigits: body.lastDigits,
+      creditLimit: body.creditLimit,
+      billingDay: body.billingDay,
+      paymentDay: body.paymentDay,
+      interestRate: body.interestRate,
+      isActive: body.isActive ?? true,
       userId: user.id,
     },
   })

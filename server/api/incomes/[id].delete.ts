@@ -7,11 +7,11 @@ export default defineEventHandler(async (event) => {
 
   const id = Number(event.context.params?.id)
 
-  const category = await prisma.category.findUnique({ where: { id } })
-  if (!category || category.userId !== user.id) {
-    throw createError({ statusCode: 404, message: 'Categoría no encontrada' })
+  const income = await prisma.income.findUnique({ where: { id } })
+  if (!income || income.userId !== user.id) {
+    throw createError({ statusCode: 404, message: 'Ingreso no encontrado' })
   }
 
-  await prisma.category.delete({ where: { id } })
-  return { message: 'Categoría eliminada' }
+  await prisma.income.delete({ where: { id } })
+  return { message: 'Ingreso eliminado' }
 })

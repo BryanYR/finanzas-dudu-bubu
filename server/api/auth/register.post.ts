@@ -1,10 +1,10 @@
-import bcrypt from "bcrypt";
-import { prisma } from "../../utils/db";
+import bcrypt from 'bcrypt'
+import { prisma } from '@server/utils/db'
 
 export default defineEventHandler(async (event) => {
-  const body = await readBody(event);
+  const body = await readBody(event)
 
-  const hash = await bcrypt.hash(body.password, 10);
+  const hash = await bcrypt.hash(body.password, 10)
 
   await prisma.user.create({
     data: {
@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
       email: body.email,
       password: hash,
     },
-  });
+  })
 
-  return { message: "Usuario creado" };
-});
+  return { message: 'Usuario creado' }
+})

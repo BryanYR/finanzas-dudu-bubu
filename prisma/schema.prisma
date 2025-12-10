@@ -4,46 +4,218 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
+// ========== USUARIO ==========
 model User {
-  id        Int       @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   name      String
-  email     String    @unique
+  email     String   @unique
   password  String
-  createdAt DateTime  @default(now())
-  categories Category[]
-  transactions Transaction[]
-  budgets BudgetProjection[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  categories        Category[]
+  incomes           Income[]
+  expenses          Expense[]
+  creditCards       CreditCard[]
+  savingsGoals      SavingsGoal[]
+  debts             Debt[]
+  budgetProjections BudgetProjection[]
 }
 
+// ========== CATEGORÍAS ==========
 model Category {
-  id        Int      @id @default(autoincrement())
-  name      String
-  type      String   // "income" | "expense"
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id])
-  transactions Transaction[]
+  id     Int     @id @default(autoincrement())
+  name   String
+  type   String // "income" | "expense"
+  icon   String? // Icono para UI
+  color  String? // Color hex para UI
+  userId Int
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  incomes  Income[]
+  expenses Expense[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, type])
 }
 
-model Transaction {
-  id        Int      @id @default(autoincrement())
-  amount    Float
-  type      String   // "income" | "expense"
-  date      DateTime @default(now())
-  notes     String?
-  categoryId Int
-  userId    Int
-  category  Category @relation(fields: [categoryId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
+// ========== INGRESOS ==========
+model Income {
+  id          Int      @id @default(autoincrement())
+  amount      Float
+  description String
+  date        DateTime @default(now())
+  isRecurring Boolean  @default(false) // Si es fijo/recurrente
+  frequency   String? // "monthly" | "biweekly" | "weekly" | "annual" | null (para extra)
+  categoryId  Int
+  userId      Int
+  notes       String?
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, date])
+  @@index([userId, isRecurring])
 }
 
+// ========== GASTOS ==========
+model Expense {
+  id           Int      @id @default(autoincrement())
+  amount       Float
+  description  String
+  date         DateTime @default(now())
+  isRecurring  Boolean  @default(false) // Si es fijo/recurrente
+  frequency    String? // "monthly" | "biweekly" | "weekly" | "annual" | null (para variado)
+  categoryId   Int
+  userId       Int
+  creditCardId Int? // Opcional: si se pagó con tarjeta
+  notes        String?
+
+  category   Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  creditCard CreditCard? @relation(fields: [creditCardId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, date])
+  @@index([userId, isRecurring])
+  @@index([creditCardId])
+}
+
+// ========== TARJETAS DE CRÉDITO ==========
+model CreditCard {
+  id           Int     @id @default(autoincrement())
+  name         String // Ej: "Visa Gold", "MasterCard Platinum"
+  bank         String // Banco emisor
+  lastDigits   String // Últimos 4 dígitos
+  creditLimit  Float // Límite de crédito
+  billingDay   Int // Día de corte (1-31)
+  paymentDay   Int // Día de pago (1-31)
+  interestRate Float? // Tasa de interés anual (opcional)
+  isActive     Boolean @default(true)
+  userId       Int
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expenses Expense[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, isActive])
+}
+
+// ========== METAS DE AHORRO ==========
+model SavingsGoal {
+  id            Int       @id @default(autoincrement())
+  name          String // Ej: "Viaje a Europa", "Fondo emergencia"
+  targetAmount  Float // Meta a alcanzar
+  currentAmount Float     @default(0) // Monto actual ahorrado
+  deadline      DateTime? // Fecha objetivo (opcional)
+  priority      Int       @default(1) // 1=alta, 2=media, 3=baja
+  description   String?
+  isCompleted   Boolean   @default(false)
+  userId        Int
+
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contributions SavingsContribution[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, isCompleted])
+}
+
+// ========== CONTRIBUCIONES A AHORROS ==========
+model SavingsContribution {
+  id            Int      @id @default(autoincrement())
+  amount        Float
+  date          DateTime @default(now())
+  notes         String?
+  savingsGoalId Int
+
+  savingsGoal SavingsGoal @relation(fields: [savingsGoalId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([savingsGoalId, date])
+}
+
+// ========== DEUDAS ==========
+model Debt {
+  id              Int       @id @default(autoincrement())
+  name            String // Ej: "Préstamo Personal", "Crédito Auto"
+  creditor        String // A quién se debe
+  totalAmount     Float // Monto total original
+  remainingAmount Float // Monto pendiente
+  interestRate    Float // Tasa de interés anual
+  monthlyPayment  Float // Cuota mensual
+  startDate       DateTime
+  endDate         DateTime? // Fecha estimada de finalización
+  isPaid          Boolean   @default(false)
+  userId          Int
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments DebtPayment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, isPaid])
+}
+
+// ========== PAGOS DE DEUDAS ==========
+model DebtPayment {
+  id            Int      @id @default(autoincrement())
+  amount        Float
+  principal     Float // Monto aplicado a capital
+  interest      Float // Monto de interés
+  date          DateTime @default(now())
+  paymentNumber Int // Número de cuota
+  notes         String?
+  debtId        Int
+
+  debt Debt @relation(fields: [debtId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([debtId, date])
+}
+
+// ========== PROYECCIONES DE PRESUPUESTO ==========
 model BudgetProjection {
-  id        Int      @id @default(autoincrement())
-  month     Int
-  year      Int
-  expectedAmount Float
-  type      String
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id])
+  id          Int      @id @default(autoincrement())
+  name        String // Ej: "Viaje a Cancún", "Compra de laptop"
+  totalBudget Float // Presupuesto total necesario
+  startDate   DateTime
+  endDate     DateTime
+  description String?
+
+  // Proyecciones
+  expectedIncome  Float // Ingresos proyectados en el período
+  fixedExpenses   Float // Gastos fijos proyectados
+  debtPayments    Float // Pagos de deudas proyectados
+  availableAmount Float // Monto disponible después de fijos
+  debitUsage      Float // Sugerencia de uso en débito
+  creditUsage     Float // Sugerencia de uso en crédito
+  savingsImpact   Float // Impacto en ahorros
+
+  isCompleted Boolean @default(false)
+  userId      Int
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, startDate])
 }

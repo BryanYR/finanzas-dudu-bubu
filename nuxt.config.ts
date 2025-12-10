@@ -1,4 +1,10 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+import { fileURLToPath } from 'node:url'
+import { dirname, resolve } from 'node:path'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+
 export default defineNuxtConfig({
   modules: ['@nuxtjs/tailwindcss'],
   devtools: { enabled: true },
@@ -7,4 +13,8 @@ export default defineNuxtConfig({
     compatibilityVersion: 4,
   },
   compatibilityDate: '2024-04-03',
+  alias: {
+    '@server': resolve(__dirname, './server'),
+    '@api': resolve(__dirname, './server/api'),
+  },
 })
