@@ -1,3 +1,85 @@
+<script setup lang="ts">
+definePageMeta({
+  layout: 'default',
+})
+
+interface Category {
+  id: number
+  name: string
+  type: string
+  icon?: string
+  color?: string
+  userId: number
+  createdAt: string
+  updatedAt: string
+}
+
+// Data fetching
+const { data: categories, pending, error, refresh } = await useFetch<Category[]>('/api/categories')
+
+// State
+const showFormModal = ref(false)
+const showDeleteModal = ref(false)
+const deleting = ref(false)
+const editingCategory = ref<Category | null>(null)
+const categoryToDelete = ref<Category | null>(null)
+const filterType = ref<'all' | 'income' | 'expense'>('all')
+
+// Table columns
+const columns = [
+  { key: 'icon', label: 'Icono', sortable: false },
+  { key: 'name', label: 'Nombre', sortable: true },
+  { key: 'type', label: 'Tipo', sortable: true },
+  { key: 'color', label: 'Color', sortable: false },
+  { key: 'actions', label: 'Acciones', sortable: false },
+]
+
+// Computed
+const filteredCategories = computed(() => {
+  if (!categories.value) return []
+  if (filterType.value === 'all') return categories.value
+  return categories.value.filter((cat) => cat.type === filterType.value)
+})
+
+// Methods
+const openCreateModal = () => {
+  editingCategory.value = null
+  showFormModal.value = true
+}
+
+const openEditModal = (category: Category) => {
+  editingCategory.value = category
+  showFormModal.value = true
+}
+
+const openDeleteModal = (category: Category) => {
+  categoryToDelete.value = category
+  showDeleteModal.value = true
+}
+
+const handleSave = async () => {
+  await refresh()
+}
+
+const deleteCategory = async () => {
+  if (!categoryToDelete.value) return
+
+  deleting.value = true
+  try {
+    await $fetch(`/api/categories/${categoryToDelete.value.id}`, {
+      method: 'DELETE',
+    })
+    showDeleteModal.value = false
+    await refresh()
+  } catch (err) {
+    console.error('Error al eliminar categoría:', err)
+    alert('Error al eliminar la categoría')
+  } finally {
+    deleting.value = false
+  }
+}
+</script>
+
 <template>
   <div class="space-y-6">
     <!-- Header -->
@@ -153,83 +235,12 @@
       </template>
     </UiDataTable>
 
-    <!-- Create/Edit Modal -->
-    <UiModal
-      v-model="showModal"
-      :title="editingCategory ? 'Editar Categoría' : 'Nueva Categoría'"
-      size="md"
-    >
-      <form @submit.prevent="saveCategory" class="space-y-4">
-        <div>
-          <label for="name" class="block text-sm font-medium text-gray-700">
-            Nombre <span class="text-red-500">*</span>
-          </label>
-          <input
-            id="name"
-            v-model="form.name"
-            type="text"
-            required
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            placeholder="Ej: Alimentación"
-          />
-        </div>
-
-        <div>
-          <label for="type" class="block text-sm font-medium text-gray-700">
-            Tipo <span class="text-red-500">*</span>
-          </label>
-          <select
-            id="type"
-            v-model="form.type"
-            required
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="">Seleccionar...</option>
-            <option value="income">Ingreso</option>
-            <option value="expense">Gasto</option>
-          </select>
-        </div>
-
-        <div>
-          <label for="icon" class="block text-sm font-medium text-gray-700"> Icono (Emoji) </label>
-          <input
-            id="icon"
-            v-model="form.icon"
-            type="text"
-            maxlength="2"
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            placeholder="Ej: 🍔"
-          />
-        </div>
-
-        <div>
-          <label for="color" class="block text-sm font-medium text-gray-700"> Color </label>
-          <div class="mt-1 flex gap-2">
-            <input
-              id="color"
-              v-model="form.color"
-              type="color"
-              class="h-10 w-20 cursor-pointer rounded-lg border border-gray-300"
-            />
-            <input
-              v-model="form.color"
-              type="text"
-              class="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="#6B7280"
-            />
-          </div>
-        </div>
-      </form>
-
-      <template #footer>
-        <div class="flex justify-end gap-3">
-          <UiButton @click="showModal = false" variant="outline"> Cancelar </UiButton>
-          <UiButton @click="saveCategory" :loading="saving" variant="primary">
-            {{ editingCategory ? 'Actualizar' : 'Crear' }}
-          </UiButton>
-        </div>
-      </template>
-    </UiModal>
+    <!-- Form Modal -->
+    <CategoriasCategoryFormModal
+      v-model:show="showFormModal"
+      :category="editingCategory"
+      @save="handleSave"
+    />
 
     <!-- Delete Confirmation Modal -->
     <UiModal v-model="showDeleteModal" title="Eliminar Categoría" size="sm">
@@ -250,128 +261,3 @@
     </UiModal>
   </div>
 </template>
-
-<script setup lang="ts">
-definePageMeta({
-  layout: 'default',
-})
-
-interface Category {
-  id: number
-  name: string
-  type: string
-  icon?: string
-  color?: string
-  userId: number
-  createdAt: string
-  updatedAt: string
-}
-
-// Data fetching
-const { data: categories, pending, error, refresh } = await useFetch<Category[]>('/api/categories')
-
-// State
-const showModal = ref(false)
-const showDeleteModal = ref(false)
-const saving = ref(false)
-const deleting = ref(false)
-const editingCategory = ref<Category | null>(null)
-const categoryToDelete = ref<Category | null>(null)
-const filterType = ref<'all' | 'income' | 'expense'>('all')
-
-const form = reactive({
-  name: '',
-  type: '',
-  icon: '',
-  color: '#6B7280',
-})
-
-// Table columns
-const columns = [
-  { key: 'icon', label: 'Icono', sortable: false },
-  { key: 'name', label: 'Nombre', sortable: true },
-  { key: 'type', label: 'Tipo', sortable: true },
-  { key: 'color', label: 'Color', sortable: false },
-  { key: 'actions', label: 'Acciones', sortable: false },
-]
-
-// Computed
-const filteredCategories = computed(() => {
-  if (!categories.value) return []
-  if (filterType.value === 'all') return categories.value
-  return categories.value.filter((cat) => cat.type === filterType.value)
-})
-
-// Methods
-const openCreateModal = () => {
-  editingCategory.value = null
-  resetForm()
-  showModal.value = true
-}
-
-const openEditModal = (category: Category) => {
-  editingCategory.value = category
-  form.name = category.name
-  form.type = category.type
-  form.icon = category.icon || ''
-  form.color = category.color || '#6B7280'
-  showModal.value = true
-}
-
-const openDeleteModal = (category: Category) => {
-  categoryToDelete.value = category
-  showDeleteModal.value = true
-}
-
-const resetForm = () => {
-  form.name = ''
-  form.type = ''
-  form.icon = ''
-  form.color = '#6B7280'
-}
-
-const saveCategory = async () => {
-  saving.value = true
-  try {
-    if (editingCategory.value) {
-      // Update
-      await $fetch(`/api/categories/${editingCategory.value.id}`, {
-        method: 'PUT',
-        body: form,
-      })
-    } else {
-      // Create
-      await $fetch('/api/categories', {
-        method: 'POST',
-        body: form,
-      })
-    }
-    showModal.value = false
-    await refresh()
-    resetForm()
-  } catch (err) {
-    console.error('Error al guardar categoría:', err)
-    alert('Error al guardar la categoría')
-  } finally {
-    saving.value = false
-  }
-}
-
-const deleteCategory = async () => {
-  if (!categoryToDelete.value) return
-
-  deleting.value = true
-  try {
-    await $fetch(`/api/categories/${categoryToDelete.value.id}`, {
-      method: 'DELETE',
-    })
-    showDeleteModal.value = false
-    await refresh()
-  } catch (err) {
-    console.error('Error al eliminar categoría:', err)
-    alert('Error al eliminar la categoría')
-  } finally {
-    deleting.value = false
-  }
-}
-</script>

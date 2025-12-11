@@ -11,6 +11,8 @@ export default defineEventHandler(async (event) => {
     data: {
       name: body.name,
       type: body.type,
+      icon: body.icon,
+      color: body.color,
       userId: user.id,
     },
   })

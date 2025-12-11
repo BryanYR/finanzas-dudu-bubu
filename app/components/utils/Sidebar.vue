@@ -203,9 +203,11 @@ const props = defineProps({
 
 defineEmits(['toggle', 'navigate'])
 
-// Datos de usuario simulados - reemplazar con datos reales
-const userName = ref('Usuario Demo')
-const userEmail = ref('demo@finanzapp.com')
+// Obtener datos del usuario autenticado
+const { data: user } = await useFetch('/api/auth/me')
+
+const userName = computed(() => user.value?.name || 'Usuario')
+const userEmail = computed(() => user.value?.email || '')
 
 const userInitials = computed(() => {
   return userName.value
@@ -219,9 +221,15 @@ const userInitials = computed(() => {
 const menuItemClass =
   'flex items-center space-x-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors hover:bg-indigo-800 hover:text-white router-link-active:bg-indigo-700 router-link-active:text-white'
 
-const handleLogout = () => {
-  // Implementar logout
-  console.log('Logout')
-  navigateTo('/login')
+const handleLogout = async () => {
+  // Hacer logout en el servidor para limpiar la cookie httpOnly
+  try {
+    await $fetch('/api/auth/logout', { method: 'POST' })
+  } catch (error) {
+    console.error('Error al cerrar sesión:', error)
+  }
+
+  // Redirigir a login con recarga completa
+  window.location.href = '/login'
 }
 </script>

@@ -8,7 +8,8 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@nuxtjs/tailwindcss": "^6.14.0",
@@ -29,6 +30,7 @@
     "@types/node": "^24.10.2",
     "@vue/eslint-config-prettier": "^10.2.0",
     "prettier": "^3.7.4",
-    "prettier-plugin-tailwindcss": "^0.7.2"
+    "prettier-plugin-tailwindcss": "^0.7.2",
+    "tsx": "^4.21.0"
   }
 }

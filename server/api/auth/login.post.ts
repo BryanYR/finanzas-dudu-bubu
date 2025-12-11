@@ -14,12 +14,22 @@ export default defineEventHandler(async (event) => {
 
   const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET!, { expiresIn: '7d' })
 
-  setCookie(event, 'session', token, {
+  setCookie(event, 'token', token, {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
     path: '/',
+    maxAge: 60 * 60 * 24 * 7, // 7 días
   })
 
-  return { message: 'OK' }
+  return {
+    message: 'Login exitoso',
+    token,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    },
+  }
 })

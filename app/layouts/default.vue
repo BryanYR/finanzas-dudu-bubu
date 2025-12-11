@@ -37,7 +37,7 @@ const closeSidebar = () => {
 
         <div class="flex items-center space-x-4">
           <h1 class="text-xl font-semibold capitalize text-gray-800 lg:text-2xl">
-            {{ $route.name || 'Dashboard' }}
+            {{ $route.name !== 'index' ? $route.name : 'Dashboard' }}
           </h1>
         </div>
 

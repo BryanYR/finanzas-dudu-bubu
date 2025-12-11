@@ -13,6 +13,7 @@ model User {
   name      String
   email     String   @unique
   password  String
+  role      String   @default("user") // "superadmin" | "admin" | "user"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -24,6 +25,8 @@ model User {
   savingsGoals      SavingsGoal[]
   debts             Debt[]
   budgetProjections BudgetProjection[]
+
+  @@index([role])
 }
 
 // ========== CATEGORÍAS ==========
@@ -69,16 +72,17 @@ model Income {
 
 // ========== GASTOS ==========
 model Expense {
-  id           Int      @id @default(autoincrement())
-  amount       Float
-  description  String
-  date         DateTime @default(now())
-  isRecurring  Boolean  @default(false) // Si es fijo/recurrente
-  frequency    String? // "monthly" | "biweekly" | "weekly" | "annual" | null (para variado)
-  categoryId   Int
-  userId       Int
-  creditCardId Int? // Opcional: si se pagó con tarjeta
-  notes        String?
+  id            Int      @id @default(autoincrement())
+  amount        Float
+  description   String
+  date          DateTime @default(now())
+  isRecurring   Boolean  @default(false) // Si es fijo/recurrente
+  frequency     String? // "monthly" | "biweekly" | "weekly" | "annual" | null (para variado)
+  categoryId    Int
+  userId        Int
+  paymentMethod String   @default("cash") // "cash" | "debit" | "credit"
+  creditCardId  Int? // Opcional: si se pagó con tarjeta de crédito
+  notes         String?
 
   category   Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -90,6 +94,7 @@ model Expense {
   @@index([userId, date])
   @@index([userId, isRecurring])
   @@index([creditCardId])
+  @@index([userId, paymentMethod])
 }
 
 // ========== TARJETAS DE CRÉDITO ==========

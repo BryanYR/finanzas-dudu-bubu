@@ -4,7 +4,7 @@ import { getCookie } from 'h3'
 import { prisma } from './db'
 
 export async function getUserFromSession(event: H3Event) {
-  const token = getCookie(event, 'session')
+  const token = getCookie(event, 'token')
   if (!token) return null
 
   try {
