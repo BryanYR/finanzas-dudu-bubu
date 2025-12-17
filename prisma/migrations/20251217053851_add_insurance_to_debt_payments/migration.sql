@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "DebtPayment" ADD COLUMN     "insurance" DOUBLE PRECISION NOT NULL DEFAULT 0;

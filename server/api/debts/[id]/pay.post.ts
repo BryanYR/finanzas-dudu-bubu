@@ -19,6 +19,8 @@ export default defineEventHandler(async (event) => {
       amount: body.amount,
       principal: body.principal,
       interest: body.interest,
+      insurance: body.insurance || 0,
+      date: body.date ? new Date(body.date) : new Date(),
       paymentNumber: body.paymentNumber,
       notes: body.notes,
       debtId: id,

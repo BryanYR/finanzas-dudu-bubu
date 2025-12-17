@@ -8,11 +8,10 @@ export default defineEventHandler(async (event) => {
   return prisma.debt.findMany({
     where: { userId: user.id },
     include: {
-      payments: {
-        orderBy: { date: 'desc' },
-        take: 5,
+      _count: {
+        select: { payments: true },
       },
     },
-    orderBy: [{ isPaid: 'asc' }, { endDate: 'asc' }],
+    orderBy: [{ isPaid: 'asc' }, { startDate: 'desc' }],
   })
 })

@@ -184,6 +184,7 @@ model DebtPayment {
   amount        Float
   principal     Float // Monto aplicado a capital
   interest      Float // Monto de interés
+  insurance     Float    @default(0) // Seguro de desgravamen
   date          DateTime @default(now())
   paymentNumber Int // Número de cuota
   notes         String?

@@ -16,6 +16,7 @@ export default defineEventHandler(async (event) => {
       frequency: body.frequency,
       notes: body.notes,
       categoryId: body.categoryId,
+      paymentMethod: body.paymentMethod || 'cash',
       creditCardId: body.creditCardId,
       userId: user.id,
     },

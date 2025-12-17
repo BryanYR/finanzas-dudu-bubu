@@ -3,7 +3,7 @@
     <Transition name="modal">
       <div
         v-if="modelValue"
-        class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto px-4 py-6"
+        class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-4 py-6 sm:items-center"
         @click.self="handleOverlayClick"
       >
         <!-- Overlay -->
@@ -12,15 +12,18 @@
         <!-- Modal -->
         <div
           :class="[
-            'relative z-50 w-full rounded-lg bg-white shadow-xl transition-all',
+            'relative z-50 my-8 flex max-h-[calc(100vh-4rem)] w-full flex-col rounded-lg bg-white shadow-xl transition-all',
             sizeClasses[size],
           ]"
         >
           <!-- Header -->
-          <div v-if="title || $slots.header" class="border-b border-gray-200 px-6 py-4">
+          <div
+            v-if="title || $slots.header"
+            class="flex-shrink-0 border-b border-gray-200 px-4 py-4 sm:px-6"
+          >
             <slot name="header">
               <div class="flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-gray-900">{{ title }}</h3>
+                <h3 class="text-base font-semibold text-gray-900 sm:text-lg">{{ title }}</h3>
                 <button
                   v-if="showClose"
                   @click="close"
@@ -40,14 +43,14 @@
           </div>
 
           <!-- Body -->
-          <div class="px-6 py-4">
+          <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
             <slot />
           </div>
 
           <!-- Footer -->
           <div
             v-if="$slots.footer"
-            class="rounded-b-lg border-t border-gray-200 bg-gray-50 px-6 py-4"
+            class="flex-shrink-0 rounded-b-lg border-t border-gray-200 bg-gray-50 px-4 py-3 sm:px-6 sm:py-4"
           >
             <slot name="footer" />
           </div>
@@ -80,9 +83,9 @@ const emit = defineEmits<{
 const sizeClasses = {
   sm: 'max-w-sm',
   md: 'max-w-md',
-  lg: 'max-w-lg',
-  xl: 'max-w-xl',
-  full: 'max-w-full mx-4',
+  lg: 'max-w-2xl',
+  xl: 'max-w-4xl',
+  full: 'max-w-6xl',
 }
 
 const close = () => {
