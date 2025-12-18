@@ -157,17 +157,18 @@ model SavingsContribution {
 
 // ========== DEUDAS ==========
 model Debt {
-  id              Int       @id @default(autoincrement())
-  name            String // Ej: "Préstamo Personal", "Crédito Auto"
-  creditor        String // A quién se debe
-  totalAmount     Float // Monto total original
-  remainingAmount Float // Monto pendiente
-  interestRate    Float // Tasa de interés anual
-  monthlyPayment  Float // Cuota mensual
-  startDate       DateTime
-  endDate         DateTime? // Fecha estimada de finalización
-  isPaid          Boolean   @default(false)
-  userId          Int
+  id                Int       @id @default(autoincrement())
+  name              String // Ej: "Préstamo Personal", "Crédito Auto"
+  creditor          String // A quién se debe
+  totalAmount       Float // Monto total original
+  remainingAmount   Float // Monto pendiente
+  interestRate      Float // Tasa de interés anual
+  monthlyPayment    Float // Cuota mensual
+  paymentDayOfMonth Int       @default(15) // Día del mes en que vence cada cuota (1-31)
+  startDate         DateTime
+  endDate           DateTime? // Fecha estimada de finalización
+  isPaid            Boolean   @default(false)
+  userId            Int
 
   user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   payments DebtPayment[]

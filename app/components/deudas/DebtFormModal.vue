@@ -7,6 +7,7 @@ interface Debt {
   remainingAmount: number
   interestRate: number
   monthlyPayment: number
+  paymentDayOfMonth: number
   startDate: string
   endDate?: string
   isPaid: boolean
@@ -23,6 +24,7 @@ const emit = defineEmits<{
 }>()
 
 const saving = ref(false)
+const { today, toISOString } = useDateFormatter()
 
 const form = reactive({
   name: '',
@@ -31,7 +33,8 @@ const form = reactive({
   remainingAmount: 0,
   interestRate: 0,
   monthlyPayment: 0,
-  startDate: new Date().toISOString().split('T')[0],
+  paymentDayOfMonth: 15,
+  startDate: today(),
   endDate: '',
 })
 
@@ -42,7 +45,8 @@ const resetForm = () => {
   form.remainingAmount = 0
   form.interestRate = 0
   form.monthlyPayment = 0
-  form.startDate = new Date().toISOString().split('T')[0]
+  form.paymentDayOfMonth = 15
+  form.startDate = today()
   form.endDate = ''
 }
 
@@ -57,7 +61,8 @@ watch(
       form.remainingAmount = newDebt.remainingAmount
       form.interestRate = newDebt.interestRate
       form.monthlyPayment = newDebt.monthlyPayment
-      form.startDate = newDebt.startDate.split('T')[0]
+      form.paymentDayOfMonth = newDebt.paymentDayOfMonth || 15
+      form.startDate = newDebt.startDate?.split('T')[0] || today()
       form.endDate = (newDebt.endDate && newDebt.endDate.split('T')[0]) || ''
     } else {
       resetForm()
@@ -79,7 +84,8 @@ watch(
       form.remainingAmount = props.debt.remainingAmount
       form.interestRate = props.debt.interestRate
       form.monthlyPayment = props.debt.monthlyPayment
-      form.startDate = props.debt.startDate.split('T')[0]
+      form.paymentDayOfMonth = props.debt.paymentDayOfMonth || 15
+      form.startDate = props.debt.startDate?.split('T')[0] || today()
       form.endDate = (props.debt.endDate && props.debt.endDate.split('T')[0]) || ''
     }
   }
@@ -105,8 +111,9 @@ const handleSave = async () => {
     remainingAmount: Number(form.remainingAmount),
     interestRate: Number(form.interestRate),
     monthlyPayment: Number(form.monthlyPayment),
-    startDate: form.startDate ? new Date(form.startDate).toISOString() : new Date().toISOString(),
-    endDate: form.endDate ? new Date(form.endDate).toISOString() : undefined,
+    paymentDayOfMonth: Number(form.paymentDayOfMonth),
+    startDate: toISOString(form.startDate),
+    endDate: form.endDate ? toISOString(form.endDate) : undefined,
   }
 
   try {
@@ -271,6 +278,25 @@ const handleSave = async () => {
             type="date"
             class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
+        </div>
+      </div>
+      <!-- Día de pago mensual -->
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div>
+          <label for="paymentDayOfMonth" class="block text-sm font-medium text-gray-700">
+            Día de pago (vencimiento) <span class="text-red-500">*</span>
+          </label>
+          <input
+            id="paymentDayOfMonth"
+            v-model="form.paymentDayOfMonth"
+            type="number"
+            required
+            min="1"
+            max="31"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            placeholder="15"
+          />
+          <p class="mt-1 text-xs text-gray-500">Día del mes en que vence cada cuota (1-31)</p>
         </div>
       </div>
 

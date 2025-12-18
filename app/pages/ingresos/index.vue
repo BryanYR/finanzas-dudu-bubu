@@ -1,34 +1,16 @@
 <script setup lang="ts">
+import type { Income } from '#types/ingreso'
+import type { Category } from '#types/categoria'
+import PlusIcon from '@components/icons/common/PlusIcon.vue'
+import TrendingUpIcon from '@components/icons/ingresos/TrendingUpIcon.vue'
+
 definePageMeta({
   layout: 'default',
 })
 
-interface Category {
-  id: number
-  name: string
-  type: string
-  icon?: string
-  color?: string
-}
-
-interface Income {
-  id: number
-  amount: number
-  description: string
-  date: string
-  isRecurring: boolean
-  frequency?: string
-  categoryId: number
-  category: Category
-  notes?: string
-  userId: number
-  createdAt: string
-  updatedAt: string
-}
-
 // Data fetching
-const { data: incomes, pending, error, refresh } = await useFetch<Income[]>('/api/incomes')
-const { data: categories } = await useFetch<Category[]>('/api/categories')
+const { data: incomes, pending, error, refresh } = await useFetchAuth<Income[]>('/api/incomes')
+const { data: categories } = await useFetchAuth<Category[]>('/api/categories')
 
 // State
 const showFormModal = ref(false)
@@ -122,13 +104,7 @@ const formatCurrency = (amount: number) => {
   }).format(amount)
 }
 
-const formatDate = (date: string) => {
-  return new Date(date).toLocaleDateString('es-EC', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-}
+const { formatDate } = useDateFormatter()
 
 const getFrequencyLabel = (frequency?: string) => {
   const labels: Record<string, string> = {
@@ -151,14 +127,7 @@ const getFrequencyLabel = (frequency?: string) => {
       </div>
       <UiButton @click="openCreateModal" variant="primary">
         <template #default>
-          <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
+          <PlusIcon custom-class="mr-2" />
           Nuevo Ingreso
         </template>
       </UiButton>

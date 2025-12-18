@@ -15,6 +15,7 @@ export default defineEventHandler(async (event) => {
       remainingAmount: body.remainingAmount || body.totalAmount,
       interestRate: body.interestRate,
       monthlyPayment: body.monthlyPayment,
+      paymentDayOfMonth: body.paymentDayOfMonth || 15,
       startDate: new Date(body.startDate),
       endDate: body.endDate ? new Date(body.endDate) : null,
       userId: user.id,

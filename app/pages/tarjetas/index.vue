@@ -1,22 +1,9 @@
 <script setup lang="ts">
+import type { CreditCard, CardStatement } from '#types/tarjeta'
+
 definePageMeta({
   layout: 'default',
 })
-
-interface CreditCard {
-  id: number
-  name: string
-  bank: string
-  lastDigits: string
-  creditLimit: number
-  billingDay: number
-  paymentDay: number
-  interestRate?: number
-  isActive: boolean
-  userId: number
-  createdAt: string
-  updatedAt: string
-}
 
 // Data fetching
 const {
@@ -24,7 +11,43 @@ const {
   pending,
   error,
   refresh,
-} = await useFetch<CreditCard[]>('/api/credit-cards')
+} = await useFetchAuth<CreditCard[]>('/api/credit-cards')
+
+// Obtener estados de cuenta de cada tarjeta activa
+const cardStatements = ref<Record<number, CardStatement>>({})
+const loadingStatements = ref(false)
+
+const loadStatements = async () => {
+  if (!creditCards.value) return
+
+  loadingStatements.value = true
+  const activeCards = creditCards.value.filter((c) => c.isActive)
+
+  try {
+    await Promise.all(
+      activeCards.map(async (card) => {
+        try {
+          const data = await $fetch(`/api/credit-cards/${card.id}/statement`)
+          cardStatements.value[card.id] = data.statement
+        } catch (err) {
+          console.error(`Error al cargar estado de cuenta de tarjeta ${card.id}:`, err)
+        }
+      })
+    )
+  } finally {
+    loadingStatements.value = false
+  }
+}
+
+// Cargar estados de cuenta al montar
+onMounted(() => {
+  loadStatements()
+})
+
+// Recargar cuando cambien las tarjetas
+watch(creditCards, () => {
+  loadStatements()
+})
 
 // State
 const showFormModal = ref(false)
@@ -73,6 +96,7 @@ const openDeleteModal = (card: CreditCard) => {
 
 const handleSave = async () => {
   await refresh()
+  await loadStatements()
 }
 
 const deleteCard = async () => {
@@ -85,6 +109,7 @@ const deleteCard = async () => {
     })
     showDeleteModal.value = false
     await refresh()
+    await loadStatements()
   } catch (err) {
     console.error('Error al eliminar tarjeta:', err)
     alert('Error al eliminar la tarjeta')
@@ -93,11 +118,39 @@ const deleteCard = async () => {
   }
 }
 
+const { $dayjs } = useNuxtApp()
+const dayjs = $dayjs as typeof import('dayjs')
+
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('es-EC', {
     style: 'currency',
     currency: 'USD',
   }).format(amount)
+}
+
+const formatDate = (dateString: string | undefined) => {
+  if (!dateString) return ''
+  return dayjs(dateString).format('DD MMM')
+}
+
+const getNextPaymentDate = (billingDay: number, paymentDay: number) => {
+  const today = dayjs()
+  const currentDay = today.date()
+
+  // Lógica simplificada: solo importa si ya pasó el día de pago este mes
+  // No importa la relación entre billingDay y paymentDay
+  if (currentDay < paymentDay) {
+    // El día de pago de este mes aún no ha llegado
+    return today.date(paymentDay)
+  } else {
+    // Ya pasó el día de pago de este mes, el próximo es el mes siguiente
+    return today.add(1, 'month').date(paymentDay)
+  }
+}
+
+const getDaysUntilPayment = (billingDay: number, paymentDay: number) => {
+  const paymentDate = getNextPaymentDate(billingDay, paymentDay)
+  return paymentDate.diff(dayjs(), 'days')
 }
 </script>
 
@@ -175,7 +228,174 @@ const formatCurrency = (amount: number) => {
       Error al cargar las tarjetas: {{ error.message }}
     </div>
 
-    <!-- Data Table -->
+    <!-- Cards View (Activas con saldo pendiente) -->
+    <div v-else-if="filterActive !== 'inactive'" class="space-y-6">
+      <!-- Resumen de deudas pendientes -->
+      <div class="rounded-xl bg-gradient-to-br from-orange-500 to-red-600 p-6 text-white shadow-lg">
+        <div class="mb-2 flex items-center justify-between">
+          <h2 class="text-lg font-semibold">💳 Deuda Total en Tarjetas</h2>
+          <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+            />
+          </svg>
+        </div>
+        <p class="text-4xl font-bold">
+          {{
+            formatCurrency(Object.values(cardStatements).reduce((sum, s) => sum + s.totalAmount, 0))
+          }}
+        </p>
+        <p class="mt-2 text-sm opacity-90">
+          Debes pagar este mes en {{ Object.keys(cardStatements).length }} tarjetas activas
+        </p>
+      </div>
+
+      <!-- Tarjetas activas con estado de cuenta -->
+      <div class="grid gap-6 md:grid-cols-2">
+        <div
+          v-for="card in filteredCards.filter((c) => c.isActive)"
+          :key="card.id"
+          class="rounded-xl bg-white shadow-md transition-shadow hover:shadow-lg"
+        >
+          <!-- Card Header con gradiente -->
+          <div
+            class="flex items-start justify-between rounded-t-xl bg-gradient-to-r from-indigo-500 to-purple-600 p-6 text-white"
+          >
+            <div>
+              <h3 class="text-xl font-bold">{{ card.name }}</h3>
+              <p class="mt-1 text-sm opacity-90">{{ card.bank }}</p>
+              <p class="mt-2 font-mono text-lg">•••• •••• •••• {{ card.lastDigits }}</p>
+            </div>
+            <div class="flex gap-2">
+              <button
+                @click="openEditModal(card)"
+                class="rounded-lg p-2 text-white/80 transition-colors hover:bg-white/20 hover:text-white"
+                title="Editar"
+              >
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Card Body -->
+          <div class="p-6">
+            <div v-if="loadingStatements" class="flex items-center justify-center py-8">
+              <div
+                class="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"
+              ></div>
+            </div>
+
+            <div v-else-if="cardStatements[card.id]" class="space-y-4">
+              <!-- Saldo pendiente -->
+              <div class="rounded-lg bg-orange-50 p-4">
+                <p class="text-sm font-medium text-orange-800">Saldo del Periodo Actual</p>
+                <p class="mt-1 text-3xl font-bold text-orange-900">
+                  {{ formatCurrency(cardStatements[card.id]?.totalAmount ?? 0) }}
+                </p>
+                <div class="mt-3 flex items-center justify-between text-sm text-orange-700">
+                  <span
+                    >Pagar antes del
+                    {{
+                      formatDate(
+                        getNextPaymentDate(card.billingDay, card.paymentDay).format('YYYY-MM-DD')
+                      )
+                    }}</span
+                  >
+                  <span
+                    :class="
+                      getDaysUntilPayment(card.billingDay, card.paymentDay) <= 7
+                        ? 'font-bold text-red-700'
+                        : ''
+                    "
+                  >
+                    {{ getDaysUntilPayment(card.billingDay, card.paymentDay) }} días
+                  </span>
+                </div>
+              </div>
+
+              <!-- Límite de crédito -->
+              <div>
+                <div class="mb-2 flex items-center justify-between text-sm text-gray-600">
+                  <span>Límite de crédito</span>
+                  <span class="font-semibold text-gray-900">{{
+                    formatCurrency(card.creditLimit)
+                  }}</span>
+                </div>
+                <div class="h-2 overflow-hidden rounded-full bg-gray-200">
+                  <div
+                    :class="[
+                      'h-full transition-all',
+                      (cardStatements[card.id]?.creditUsagePercent ?? 0) > 80
+                        ? 'bg-red-500'
+                        : (cardStatements[card.id]?.creditUsagePercent ?? 0) > 50
+                          ? 'bg-yellow-500'
+                          : 'bg-green-500',
+                    ]"
+                    :style="{ width: (cardStatements[card.id]?.creditUsagePercent ?? 0) + '%' }"
+                  ></div>
+                </div>
+                <p class="mt-1 text-xs text-gray-500">
+                  Disponible:
+                  {{ formatCurrency(cardStatements[card.id]?.availableCredit ?? 0) }} ({{
+                    (100 - (cardStatements[card.id]?.creditUsagePercent ?? 0)).toFixed(1)
+                  }}%)
+                </p>
+              </div>
+
+              <!-- Estadísticas -->
+              <div class="grid grid-cols-2 gap-4 rounded-lg bg-gray-50 p-4">
+                <div>
+                  <p class="text-xs text-gray-600">Corte</p>
+                  <p class="text-sm font-semibold text-gray-900">Día {{ card.billingDay }}</p>
+                </div>
+                <div>
+                  <p class="text-xs text-gray-600">Pago</p>
+                  <p class="text-sm font-semibold text-gray-900">Día {{ card.paymentDay }}</p>
+                </div>
+              </div>
+            </div>
+
+            <div v-else class="py-4 text-center text-sm text-gray-500">
+              No hay gastos registrados este periodo
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty state para activas -->
+      <div
+        v-if="filteredCards.filter((c) => c.isActive).length === 0"
+        class="rounded-lg bg-white p-12 text-center shadow-sm"
+      >
+        <svg
+          class="mx-auto h-12 w-12 text-gray-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+          />
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">No hay tarjetas activas</h3>
+        <p class="mt-1 text-sm text-gray-500">Comienza agregando una nueva tarjeta de crédito.</p>
+      </div>
+    </div>
+
+    <!-- Data Table (para vista de todas o inactivas) -->
     <UiDataTable v-else :data="filteredCards" :columns="columns" :items-per-page="10">
       <template #cell-lastDigits="{ value }">
         <span class="font-mono">•••• {{ value }}</span>

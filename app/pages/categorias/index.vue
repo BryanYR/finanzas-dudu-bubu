@@ -1,21 +1,18 @@
 <script setup lang="ts">
+import type { Category } from '#types/categoria'
+import PlusIcon from '@components/icons/common/PlusIcon.vue'
+
 definePageMeta({
   layout: 'default',
 })
 
-interface Category {
-  id: number
-  name: string
-  type: string
-  icon?: string
-  color?: string
-  userId: number
-  createdAt: string
-  updatedAt: string
-}
-
 // Data fetching
-const { data: categories, pending, error, refresh } = await useFetch<Category[]>('/api/categories')
+const {
+  data: categories,
+  pending,
+  error,
+  refresh,
+} = await useFetchAuth<Category[]>('/api/categories')
 
 // State
 const showFormModal = ref(false)
@@ -90,14 +87,7 @@ const deleteCategory = async () => {
       </div>
       <UiButton @click="openCreateModal" variant="primary">
         <template #default>
-          <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
+          <PlusIcon custom-class="mr-2" />
           Nueva Categoría
         </template>
       </UiButton>

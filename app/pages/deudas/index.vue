@@ -1,24 +1,9 @@
 <script setup lang="ts">
+import type { Debt } from '#types/deuda'
+
 definePageMeta({
   layout: 'default',
 })
-
-interface Debt {
-  id: number
-  name: string
-  creditor: string
-  totalAmount: number
-  remainingAmount: number
-  interestRate: number
-  monthlyPayment: number
-  startDate: string
-  endDate?: string
-  isPaid: boolean
-  _count?: {
-    payments: number
-  }
-  totalPayments?: number
-}
 
 // State
 const debts = ref<Debt[]>([])
@@ -31,10 +16,12 @@ const selectedDebt = ref<Debt | null>(null)
 const filterType = ref('all') // all, active, paid
 
 // Fetch data
+const $authFetch = useAuthFetch()
+
 const fetchDebts = async () => {
   loading.value = true
   try {
-    const data = await $fetch<Debt[]>('/api/debts')
+    const data = await $authFetch<Debt[]>('/api/debts')
     debts.value = data
   } catch (err) {
     console.error('Error al cargar deudas:', err)
@@ -103,7 +90,7 @@ const handleDelete = async (debt: Debt) => {
     return
 
   try {
-    await $fetch(`/api/debts/${debt.id}`, { method: 'DELETE' })
+    await $authFetch(`/api/debts/${debt.id}`, { method: 'DELETE' })
     await fetchDebts()
   } catch (err) {
     console.error('Error al eliminar:', err)
@@ -137,14 +124,7 @@ const formatCurrency = (amount: number) => {
   }).format(amount)
 }
 
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString)
-  return new Intl.DateTimeFormat('es-EC', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  }).format(date)
-}
+const { formatDate } = useDateFormatter()
 
 const getProgressPercentage = (debt: Debt) => {
   const paid = debt.totalAmount - debt.remainingAmount

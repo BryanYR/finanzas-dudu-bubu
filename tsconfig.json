@@ -5,7 +5,9 @@
     "paths": {
       "@server/*": ["./server/*"],
       "@api/*": ["./server/api/*"],
-      "@prisma/*": ["./prisma/*"]
+      "@prisma/*": ["./prisma/*"],
+      "@components/*": ["./app/components/*"],
+      "#types/*": ["./app/types/*"]
     }
   }
 }

@@ -39,11 +39,12 @@ const emit = defineEmits<{
 }>()
 
 const saving = ref(false)
+const { toISOString, today } = useDateFormatter()
 
 const form = reactive({
   amount: 0,
   description: '',
-  date: new Date().toISOString().split('T')[0],
+  date: today(),
   isRecurring: false,
   frequency: '',
   categoryId: 0,
@@ -55,7 +56,7 @@ const form = reactive({
 const resetForm = () => {
   form.amount = 0
   form.description = ''
-  form.date = new Date().toISOString().split('T')[0]
+  form.date = today()
   form.isRecurring = false
   form.frequency = ''
   form.categoryId = 0
@@ -121,7 +122,7 @@ const handleSave = async () => {
   const dataToSend = {
     amount: Number(form.amount),
     description: form.description,
-    date: form.date ? new Date(form.date).toISOString() : new Date().toISOString(),
+    date: toISOString(form.date),
     isRecurring: form.isRecurring,
     frequency: form.isRecurring && form.frequency ? form.frequency : undefined,
     categoryId: Number(form.categoryId),

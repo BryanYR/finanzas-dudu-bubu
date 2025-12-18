@@ -15,8 +15,8 @@ export async function getUserFromSession(event: H3Event) {
   }
 }
 
-export function requireUser(event: H3Event) {
-  const user = getUserFromSession(event)
+export async function requireUser(event: H3Event) {
+  const user = await getUserFromSession(event)
   if (!user) {
     throw createError({ statusCode: 401, message: 'No autorizado' })
   }

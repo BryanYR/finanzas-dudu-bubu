@@ -1,36 +1,11 @@
 <script setup lang="ts">
+import type { Expense } from '#types/gasto'
+import type { Category } from '#types/categoria'
+import type { CreditCard } from '#types/tarjeta'
+
 definePageMeta({
   layout: 'default',
 })
-
-interface Category {
-  id: number
-  name: string
-  type: string
-}
-
-interface CreditCard {
-  id: number
-  name: string
-  bank: string
-  lastDigits: string
-  isActive?: boolean
-}
-
-interface Expense {
-  id: number
-  amount: number
-  description: string
-  date: string
-  isRecurring: boolean
-  frequency?: string
-  paymentMethod: string
-  notes?: string
-  categoryId: number
-  creditCardId?: number
-  category: Category
-  creditCard?: CreditCard
-}
 
 // State
 const expenses = ref<Expense[]>([])
@@ -42,10 +17,12 @@ const editingExpense = ref<Expense | null>(null)
 const filterType = ref('all') // all, recurring, one-time, cash, debit, credit
 
 // Fetch data
+const $authFetch = useAuthFetch()
+
 const fetchExpenses = async () => {
   loading.value = true
   try {
-    const data = await $fetch<Expense[]>('/api/expenses')
+    const data = await $authFetch<Expense[]>('/api/expenses')
     expenses.value = data
   } catch (err) {
     console.error('Error al cargar gastos:', err)
@@ -56,7 +33,7 @@ const fetchExpenses = async () => {
 
 const fetchCategories = async () => {
   try {
-    const data = await $fetch<Category[]>('/api/categories')
+    const data = await $authFetch<Category[]>('/api/categories')
     categories.value = data
   } catch (err) {
     console.error('Error al cargar categorías:', err)
@@ -65,7 +42,7 @@ const fetchCategories = async () => {
 
 const fetchCreditCards = async () => {
   try {
-    const data = await $fetch<CreditCard[]>('/api/credit-cards')
+    const data = await $authFetch<CreditCard[]>('/api/credit-cards')
     creditCards.value = data
   } catch (err) {
     console.error('Error al cargar tarjetas:', err)
@@ -144,7 +121,7 @@ const handleDelete = async (expense: Expense) => {
   if (!confirm('¿Estás seguro de eliminar este gasto?')) return
 
   try {
-    await $fetch(`/api/expenses/${expense.id}`, { method: 'DELETE' })
+    await $authFetch(`/api/expenses/${expense.id}`, { method: 'DELETE' })
     await fetchExpenses()
   } catch (err) {
     console.error('Error al eliminar:', err)
@@ -164,14 +141,7 @@ const formatCurrency = (amount: number) => {
   }).format(amount)
 }
 
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString)
-  return new Intl.DateTimeFormat('es-EC', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  }).format(date)
-}
+const { formatDate } = useDateFormatter()
 
 const formatPaymentMethod = (method: string) => {
   const methods: Record<string, string> = {

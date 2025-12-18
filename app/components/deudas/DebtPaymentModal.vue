@@ -20,13 +20,14 @@ const emit = defineEmits<{
 }>()
 
 const saving = ref(false)
+const { today, toISOString } = useDateFormatter()
 
 const form = reactive({
   amount: 0,
   principal: 0,
   interest: 0,
   insurance: 0,
-  date: new Date().toISOString().split('T')[0],
+  date: today(),
   paymentNumber: 1,
   notes: '',
 })
@@ -37,7 +38,7 @@ const resetForm = () => {
   form.principal = 0
   form.interest = 0
   form.insurance = 0
-  form.date = new Date().toISOString().split('T')[0]
+  form.date = today()
   form.paymentNumber = (props.debt?.totalPayments || 0) + 1
   form.notes = ''
   calculateSplit()
@@ -128,7 +129,7 @@ const handleSave = async () => {
     principal: Number(form.principal),
     interest: Number(form.interest),
     insurance: Number(form.insurance),
-    date: form.date ? new Date(form.date).toISOString() : new Date().toISOString(),
+    date: toISOString(form.date),
     paymentNumber: form.paymentNumber,
     notes: form.notes || undefined,
   }
