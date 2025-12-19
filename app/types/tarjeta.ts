@@ -21,5 +21,5 @@ export interface CardStatement {
   transactionCount: number
   creditUsagePercent: number
   availableCredit: number
-  paymentDueDate?: string
+  paymentDueDate: string
 }

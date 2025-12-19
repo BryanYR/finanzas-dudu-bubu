@@ -82,6 +82,7 @@ model Expense {
   userId        Int
   paymentMethod String   @default("cash") // "cash" | "debit" | "credit"
   creditCardId  Int? // Opcional: si se pagó con tarjeta de crédito
+  isPaidOff     Boolean  @default(false) // Para gastos con tarjeta: marca si el estado de cuenta ya fue pagado
   notes         String?
 
   category   Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
@@ -164,6 +165,7 @@ model Debt {
   remainingAmount   Float // Monto pendiente
   interestRate      Float // Tasa de interés anual
   monthlyPayment    Float // Cuota mensual
+  totalInstallments Int?      @default(12) // Número total de cuotas del préstamo
   paymentDayOfMonth Int       @default(15) // Día del mes en que vence cada cuota (1-31)
   startDate         DateTime
   endDate           DateTime? // Fecha estimada de finalización

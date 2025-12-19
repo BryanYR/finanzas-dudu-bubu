@@ -22,6 +22,7 @@ export default defineEventHandler(async (event) => {
   if (body.remainingAmount !== undefined) updateData.remainingAmount = body.remainingAmount
   if (body.interestRate !== undefined) updateData.interestRate = body.interestRate
   if (body.monthlyPayment !== undefined) updateData.monthlyPayment = body.monthlyPayment
+  if (body.totalInstallments !== undefined) updateData.totalInstallments = body.totalInstallments
   if (body.paymentDayOfMonth !== undefined) updateData.paymentDayOfMonth = body.paymentDayOfMonth
   if (body.startDate) updateData.startDate = new Date(body.startDate)
   if (body.endDate !== undefined) {

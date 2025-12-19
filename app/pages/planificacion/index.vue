@@ -154,17 +154,25 @@ const getStatusText = (status: string) => {
           </div>
         </div>
 
-        <!-- Saldo Disponible -->
+        <!-- Saldo Actual -->
         <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
           <div class="flex items-center justify-between">
-            <div>
+            <div class="w-full">
               <p class="text-sm font-medium text-gray-600">Saldo Actual</p>
               <p class="mt-2 text-2xl font-bold text-blue-600">
                 {{ formatCurrency(paymentPlan.summary.currentBalance) }}
               </p>
-              <p class="mt-1 text-xs text-gray-500">
-                Disponible: {{ formatCurrency(paymentPlan.summary.availableBalance) }}
-              </p>
+              <div class="mt-2 space-y-1">
+                <p
+                  v-if="paymentPlan.summary.pendingIncome && paymentPlan.summary.pendingIncome > 0"
+                  class="text-xs font-semibold text-green-600"
+                >
+                  + {{ formatCurrency(paymentPlan.summary.pendingIncome) }} pendiente
+                </p>
+                <p class="text-xs text-gray-500">
+                  = {{ formatCurrency(paymentPlan.summary.availableBalance) }} disponible
+                </p>
+              </div>
             </div>
             <div class="rounded-full bg-blue-100 p-3">
               <WalletIcon custom-class="text-blue-600" />
@@ -202,15 +210,22 @@ const getStatusText = (status: string) => {
           </div>
         </div>
 
-        <!-- Colchón de Seguridad -->
+        <!-- Saldo Proyectado -->
         <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm font-medium text-gray-600">Colchón Recomendado</p>
-              <p class="mt-2 text-2xl font-bold text-purple-600">
-                {{ formatCurrency(paymentPlan.summary.suggestedSafetyBuffer) }}
+              <p class="text-sm font-medium text-gray-600">Saldo Proyectado</p>
+              <p
+                class="mt-2 text-2xl font-bold"
+                :class="
+                  paymentPlan.summary.projectedBalance && paymentPlan.summary.projectedBalance >= 0
+                    ? 'text-green-600'
+                    : 'text-red-600'
+                "
+              >
+                {{ formatCurrency(paymentPlan.summary.projectedBalance ?? 0) }}
               </p>
-              <p class="mt-1 text-xs text-gray-500">10% de tus ingresos</p>
+              <p class="mt-1 text-xs text-gray-500">Después de pagos</p>
             </div>
             <div class="rounded-full bg-purple-100 p-3">
               <svg
@@ -253,13 +268,88 @@ const getStatusText = (status: string) => {
             </svg>
           </div>
           <div class="ml-3">
-            <h3 class="text-sm font-medium text-yellow-800">Recomendaciones Importantes</h3>
+            <h3 class="text-sm font-medium text-yellow-800">Análisis de tu Situación Financiera</h3>
             <div class="mt-2 text-sm text-yellow-700">
-              <ul class="list-disc space-y-1 pl-5">
-                <li v-for="(warning, idx) in paymentPlan.summary.warnings" :key="idx">
-                  {{ warning }}
+              <ul class="space-y-1">
+                <li
+                  v-for="(warning, idx) in paymentPlan.summary.warnings"
+                  :key="idx"
+                  class="flex items-start"
+                >
+                  <span class="mr-2 mt-0.5">•</span>
+                  <span>{{ warning }}</span>
                 </li>
               </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Estrategia de Pago Sugerida -->
+      <div
+        class="rounded-lg border-2 border-indigo-200 bg-gradient-to-r from-indigo-50 to-blue-50 p-6"
+      >
+        <div class="flex items-start">
+          <div class="flex-shrink-0">
+            <svg
+              class="h-8 w-8 text-indigo-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+              />
+            </svg>
+          </div>
+          <div class="ml-4 flex-1">
+            <h3 class="text-lg font-bold text-indigo-900">📋 Estrategia de Pago Optimizada</h3>
+            <div class="mt-3 space-y-2 text-sm text-indigo-800">
+              <p class="font-medium">
+                Con tu saldo actual de
+                <span class="font-bold">{{
+                  formatCurrency(paymentPlan.summary.currentBalance)
+                }}</span>
+                <span
+                  v-if="paymentPlan.summary.pendingIncome && paymentPlan.summary.pendingIncome > 0"
+                >
+                  más
+                  <span class="font-bold text-green-700">{{
+                    formatCurrency(paymentPlan.summary.pendingIncome)
+                  }}</span>
+                  de ingresos esperados </span
+                >, puedes cubrir tus obligaciones siguiendo este plan:
+              </p>
+              <div class="mt-4 grid gap-3 md:grid-cols-3">
+                <div class="rounded-lg bg-white/80 p-3 shadow-sm">
+                  <p class="text-xs font-medium text-gray-600">PASO 1: Pagos Urgentes</p>
+                  <p class="mt-1 text-lg font-bold text-red-600">
+                    {{ paymentPlan.suggestions.filter((s) => s.priority === 'urgent').length }}
+                  </p>
+                  <p class="text-xs text-gray-600">Hacerlos HOY</p>
+                </div>
+                <div class="rounded-lg bg-white/80 p-3 shadow-sm">
+                  <p class="text-xs font-medium text-gray-600">PASO 2: Prioridad Alta</p>
+                  <p class="mt-1 text-lg font-bold text-orange-600">
+                    {{ paymentPlan.suggestions.filter((s) => s.priority === 'high').length }}
+                  </p>
+                  <p class="text-xs text-gray-600">Esta semana</p>
+                </div>
+                <div class="rounded-lg bg-white/80 p-3 shadow-sm">
+                  <p class="text-xs font-medium text-gray-600">PASO 3: Resto</p>
+                  <p class="mt-1 text-lg font-bold text-blue-600">
+                    {{
+                      paymentPlan.suggestions.filter(
+                        (s) => s.priority === 'medium' || s.priority === 'low'
+                      ).length
+                    }}
+                  </p>
+                  <p class="text-xs text-gray-600">Antes de vencimiento</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -360,13 +450,19 @@ const getStatusText = (status: string) => {
                   Fecha
                 </th>
                 <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Pagos
+                  Tipo
                 </th>
                 <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Monto
+                  Descripción
                 </th>
-                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Saldo Proyectado
+                <th class="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">
+                  Ingresos
+                </th>
+                <th class="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">
+                  Gastos
+                </th>
+                <th class="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">
+                  Saldo
                 </th>
               </tr>
             </thead>
@@ -374,23 +470,56 @@ const getStatusText = (status: string) => {
               <tr
                 v-for="day in paymentPlan.cashFlowProjection"
                 :key="day.date"
-                :class="day.balance < 0 ? 'bg-red-50' : ''"
+                :class="[
+                  day.balance < 0 ? 'bg-red-50' : '',
+                  day.type === 'income' ? 'bg-green-50' : '',
+                ]"
               >
-                <td class="whitespace-nowrap px-4 py-3 text-sm">
+                <td class="whitespace-nowrap px-4 py-3 text-sm font-medium">
                   {{ formatDate(day.date) }}
                 </td>
+                <td class="whitespace-nowrap px-4 py-3 text-sm">
+                  <span
+                    v-if="day.type === 'income'"
+                    class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800"
+                  >
+                    💰 Ingreso
+                  </span>
+                  <span
+                    v-else
+                    class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800"
+                  >
+                    📤 Pagos
+                  </span>
+                </td>
                 <td class="px-4 py-3 text-sm">
-                  <div class="space-y-1">
-                    <div v-for="payment in day.payments" :key="payment.id" class="text-xs">
+                  <div v-if="day.type === 'income'" class="font-medium text-green-700">
+                    Ingreso recurrente esperado
+                  </div>
+                  <div v-else class="space-y-1">
+                    <div
+                      v-for="payment in day.payments"
+                      :key="payment.id"
+                      class="text-xs text-gray-700"
+                    >
                       {{ payment.name }}
                     </div>
                   </div>
                 </td>
-                <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-red-600">
-                  -{{ formatCurrency(day.expenses) }}
+                <td
+                  class="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-green-600"
+                >
+                  <span v-if="day.income > 0">+{{ formatCurrency(day.income) }}</span>
+                  <span v-else class="text-gray-400">-</span>
                 </td>
                 <td
-                  class="whitespace-nowrap px-4 py-3 text-sm font-bold"
+                  class="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-red-600"
+                >
+                  <span v-if="day.expenses > 0">-{{ formatCurrency(day.expenses) }}</span>
+                  <span v-else class="text-gray-400">-</span>
+                </td>
+                <td
+                  class="whitespace-nowrap px-4 py-3 text-right text-sm font-bold"
                   :class="day.balance < 0 ? 'text-red-600' : 'text-green-600'"
                 >
                   {{ formatCurrency(day.balance) }}

@@ -15,6 +15,8 @@ const { data: categories } = await useFetchAuth<Category[]>('/api/categories')
 // State
 const showFormModal = ref(false)
 const showDeleteModal = ref(false)
+const generatingRecurring = ref(false)
+const generationResult = ref<{ generated: any[]; skipped: any[] } | null>(null)
 const deleting = ref(false)
 const editingIncome = ref<Income | null>(null)
 const incomeToDelete = ref<Income | null>(null)
@@ -79,6 +81,31 @@ const handleSave = async () => {
   await refresh()
 }
 
+const generateRecurringIncomes = async () => {
+  generatingRecurring.value = true
+  generationResult.value = null
+
+  try {
+    const result = await $fetch('/api/incomes/generate-recurring', {
+      method: 'POST',
+    })
+    generationResult.value = result
+    await refresh()
+
+    // Mostrar notificación
+    if (result.generated.length > 0) {
+      alert(`✅ Se generaron ${result.generated.length} ingresos recurrentes`)
+    } else if (result.skipped.length > 0) {
+      alert(`ℹ️ No hay ingresos pendientes por generar este mes`)
+    }
+  } catch (err: any) {
+    console.error('Error al generar ingresos recurrentes:', err)
+    alert('Error al generar ingresos recurrentes')
+  } finally {
+    generatingRecurring.value = false
+  }
+}
+
 const deleteIncome = async () => {
   if (!incomeToDelete.value) return
 
@@ -125,12 +152,31 @@ const getFrequencyLabel = (frequency?: string) => {
         <h1 class="text-2xl font-bold text-gray-900">Ingresos</h1>
         <p class="mt-1 text-sm text-gray-600">Registra y gestiona tus ingresos</p>
       </div>
-      <UiButton @click="openCreateModal" variant="primary">
-        <template #default>
-          <PlusIcon custom-class="mr-2" />
-          Nuevo Ingreso
-        </template>
-      </UiButton>
+      <div class="flex gap-3">
+        <UiButton
+          @click="generateRecurringIncomes"
+          :loading="generatingRecurring"
+          variant="outline"
+        >
+          <template #default>
+            <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+            Generar Recurrentes
+          </template>
+        </UiButton>
+        <UiButton @click="openCreateModal" variant="primary">
+          <template #default>
+            <PlusIcon custom-class="mr-2" />
+            Nuevo Ingreso
+          </template>
+        </UiButton>
+      </div>
     </div>
 
     <!-- Stats Cards -->

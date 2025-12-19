@@ -4,12 +4,13 @@ import { requireUser } from '@server/utils/auth'
 export default defineEventHandler(async (event) => {
   const user = await requireUser(event)
 
-  // Obtener fecha del mes actual
+  // Obtener fecha del mes actual y siguiente
   const now = new Date()
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+  const endOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 2, 0, 23, 59, 59)
 
-  // Obtener ingresos mensuales recurrentes
+  // Obtener ingresos mensuales recurrentes (como sueldo)
   const recurringIncomes = await prisma.income.findMany({
     where: {
       userId: user.id,
@@ -17,42 +18,176 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  // Obtener ingresos del mes actual
-  const monthlyIncomes = await prisma.income.findMany({
+  // Obtener ingresos que ya se recibieron este mes
+  const receivedIncomesThisMonth = await prisma.income.findMany({
     where: {
       userId: user.id,
       date: {
         gte: startOfMonth,
-        lte: endOfMonth,
+        lte: now, // Solo hasta hoy
       },
     },
   })
 
-  // Obtener deudas activas
+  // Obtener gastos que ya se hicieron este mes (solo efectivo/débito, NO tarjetas)
+  const expensesThisMonth = await prisma.expense.findMany({
+    where: {
+      userId: user.id,
+      date: {
+        gte: startOfMonth,
+        lte: now,
+      },
+      // Excluir gastos con tarjeta de crédito (esos se pagan después)
+      creditCardId: null,
+    },
+  })
+
+  // Calcular saldo actual real (ingresos recibidos - solo gastos en efectivo/débito)
+  const totalReceivedIncome = receivedIncomesThisMonth.reduce((sum, inc) => sum + inc.amount, 0)
+  const totalSpentCashDebit = expensesThisMonth.reduce((sum, exp) => sum + exp.amount, 0)
+  const currentBalance = totalReceivedIncome - totalSpentCashDebit
+
+  // Calcular ingresos proyectados para el resto del mes (ingresos recurrentes pendientes)
+  const totalRecurringIncome = recurringIncomes.reduce((sum, inc) => sum + inc.amount, 0)
+
+  // Verificar si ya se recibieron los ingresos recurrentes este mes
+  const receivedRecurringThisMonth = receivedIncomesThisMonth.filter((inc) => inc.isRecurring)
+  const pendingRecurringIncome = receivedRecurringThisMonth.length === 0 ? totalRecurringIncome : 0
+
+  // Total disponible = saldo actual + ingresos pendientes del mes
+  const projectedAvailableBalance = currentBalance + pendingRecurringIncome
+
+  // Obtener deudas activas con sus pagos
   const activeDebts = await prisma.debt.findMany({
     where: {
       userId: user.id,
       isPaid: false,
     },
+    include: {
+      payments: {
+        orderBy: {
+          date: 'desc',
+        },
+        take: 1, // Solo el último pago
+      },
+    },
   })
 
-  // Obtener tarjetas activas con gastos del mes
+  // Obtener tarjetas activas
   const creditCards = await prisma.creditCard.findMany({
     where: {
       userId: user.id,
       isActive: true,
     },
-    include: {
-      expenses: {
-        where: {
-          date: {
-            gte: startOfMonth,
-            lte: endOfMonth,
-          },
-        },
-      },
-    },
   })
+
+  // Para cada tarjeta, calcular el estado de cuenta actual usando la misma lógica que statement.get.ts
+  const cardStatements = await Promise.all(
+    creditCards.map(async (card) => {
+      const currentDay = now.getDate()
+      const currentMonth = now.getMonth()
+      const currentYear = now.getFullYear()
+
+      // Función auxiliar para calcular la fecha de pago basada en la fecha de corte
+      const getPaymentDueDate = (billingEndDate: Date, paymentDay: number): Date => {
+        const billingEndMonth = billingEndDate.getMonth()
+        const billingEndYear = billingEndDate.getFullYear()
+        const billingDay = billingEndDate.getDate()
+
+        if (paymentDay > billingDay) {
+          return new Date(billingEndYear, billingEndMonth, paymentDay, 23, 59, 59)
+        } else {
+          return new Date(billingEndYear, billingEndMonth + 1, paymentDay, 23, 59, 59)
+        }
+      }
+
+      // Calcular el último período CERRADO (el que debe pagarse pronto)
+      let lastClosedStart: Date
+      let lastClosedEnd: Date
+      let lastClosedPaymentDue: Date
+
+      if (currentDay > card.billingDay) {
+        // Ya pasamos el corte de este mes
+        lastClosedStart = new Date(currentYear, currentMonth - 1, card.billingDay + 1, 0, 0, 0)
+        lastClosedEnd = new Date(currentYear, currentMonth, card.billingDay, 23, 59, 59)
+        lastClosedPaymentDue = getPaymentDueDate(lastClosedEnd, card.paymentDay)
+      } else {
+        // Todavía no llega el corte de este mes
+        lastClosedStart = new Date(currentYear, currentMonth - 2, card.billingDay + 1, 0, 0, 0)
+        lastClosedEnd = new Date(currentYear, currentMonth - 1, card.billingDay, 23, 59, 59)
+        lastClosedPaymentDue = getPaymentDueDate(lastClosedEnd, card.paymentDay)
+      }
+
+      // Calcular el período ACTUAL en curso (el que aún no cierra)
+      let currentPeriodStart: Date
+      let currentPeriodEnd: Date
+      let currentPeriodPaymentDue: Date
+
+      if (currentDay > card.billingDay) {
+        // Ya pasamos el corte, estamos en el nuevo período
+        currentPeriodStart = new Date(currentYear, currentMonth, card.billingDay + 1, 0, 0, 0)
+        currentPeriodEnd = new Date(currentYear, currentMonth + 1, card.billingDay, 23, 59, 59)
+        currentPeriodPaymentDue = getPaymentDueDate(currentPeriodEnd, card.paymentDay)
+      } else {
+        // Todavía no llega el corte, estamos en el período que cerrará pronto
+        currentPeriodStart = new Date(currentYear, currentMonth - 1, card.billingDay + 1, 0, 0, 0)
+        currentPeriodEnd = new Date(currentYear, currentMonth, card.billingDay, 23, 59, 59)
+        currentPeriodPaymentDue = getPaymentDueDate(currentPeriodEnd, card.paymentDay)
+      }
+
+      // Verificar si hay gastos sin pagar del período cerrado
+      const unpaidFromLastPeriod = await prisma.expense.count({
+        where: {
+          userId: user.id,
+          creditCardId: card.id,
+          date: {
+            gte: lastClosedStart,
+            lte: lastClosedEnd,
+          },
+          isPaidOff: false,
+        },
+      })
+
+      // Decidir qué período mostrar
+      let billingStartDate: Date
+      let billingEndDate: Date
+      let paymentDueDate: Date
+
+      if (unpaidFromLastPeriod > 0 && currentDay > card.billingDay) {
+        // Mostrar el período cerrado que aún no se ha pagado
+        billingStartDate = lastClosedStart
+        billingEndDate = lastClosedEnd
+        paymentDueDate = lastClosedPaymentDue
+      } else {
+        // Mostrar el período en curso
+        billingStartDate = currentPeriodStart
+        billingEndDate = currentPeriodEnd
+        paymentDueDate = currentPeriodPaymentDue
+      }
+
+      // Obtener gastos del periodo (solo no pagados)
+      const expenses = await prisma.expense.findMany({
+        where: {
+          userId: user.id,
+          creditCardId: card.id,
+          date: {
+            gte: billingStartDate,
+            lte: billingEndDate,
+          },
+          isPaidOff: false, // Solo gastos no pagados
+        },
+      })
+
+      const totalAmount = expenses.reduce((sum, expense) => sum + expense.amount, 0)
+
+      return {
+        card,
+        totalAmount,
+        paymentDueDate,
+        billingEndDate,
+      }
+    })
+  )
 
   // Obtener gastos fijos recurrentes
   const recurringExpenses = await prisma.expense.findMany({
@@ -65,36 +200,36 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  // Calcular total de ingresos mensuales
-  const totalRecurringIncome = recurringIncomes.reduce((sum, inc) => sum + inc.amount, 0)
-  const totalMonthlyIncome = monthlyIncomes.reduce((sum, inc) => sum + inc.amount, 0)
-  const totalIncome = totalRecurringIncome + totalMonthlyIncome
-
-  // Calcular saldo actual (últimos ingresos - gastos del mes)
-  const monthlyExpenses = await prisma.expense.findMany({
-    where: {
-      userId: user.id,
-      date: {
-        gte: startOfMonth,
-        lte: endOfMonth,
-      },
-    },
-  })
-
-  const totalExpenses = monthlyExpenses.reduce((sum, exp) => sum + exp.amount, 0)
-  const currentBalance = totalIncome - totalExpenses
-
   // Crear sugerencias de pago
   const suggestions: any[] = []
 
   // 1. Deudas - priorizar por tasa de interés y fecha de pago
   activeDebts.forEach((debt) => {
-    // Usar el día de pago configurado en la deuda
-    let dueDate = new Date(now.getFullYear(), now.getMonth(), debt.paymentDayOfMonth)
+    let dueDate: Date
 
-    // Si la fecha ya pasó este mes, usar el siguiente mes
-    if (dueDate < now) {
-      dueDate = new Date(now.getFullYear(), now.getMonth() + 1, debt.paymentDayOfMonth)
+    // Si hay pagos realizados, calcular en base al último pago
+    if (debt.payments && debt.payments.length > 0 && debt.payments[0]) {
+      const lastPaymentDate = new Date(debt.payments[0].date)
+
+      // La próxima cuota es el mismo día del mes siguiente
+      dueDate = new Date(
+        lastPaymentDate.getFullYear(),
+        lastPaymentDate.getMonth() + 1,
+        debt.paymentDayOfMonth
+      )
+
+      // Si ya pasó esa fecha, calcular para el siguiente mes
+      if (dueDate < now) {
+        dueDate = new Date(now.getFullYear(), now.getMonth() + 1, debt.paymentDayOfMonth)
+      }
+    } else {
+      // Si no hay pagos, usar el día de pago configurado en la deuda
+      dueDate = new Date(now.getFullYear(), now.getMonth(), debt.paymentDayOfMonth)
+
+      // Si la fecha ya pasó este mes, usar el siguiente mes
+      if (dueDate < now) {
+        dueDate = new Date(now.getFullYear(), now.getMonth() + 1, debt.paymentDayOfMonth)
+      }
     }
 
     const daysUntilDue = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
@@ -130,27 +265,22 @@ export default defineEventHandler(async (event) => {
     })
   })
 
-  // 2. Tarjetas de crédito - calcular monto y fecha de pago
-  creditCards.forEach((card) => {
-    const totalCardExpenses = card.expenses.reduce((sum, exp) => sum + exp.amount, 0)
-    if (totalCardExpenses === 0) return
+  // 2. Tarjetas de crédito - usar el cálculo correcto del ciclo
+  cardStatements.forEach(({ card, totalAmount, paymentDueDate }) => {
+    if (totalAmount === 0) return
 
-    // Usar el día de pago configurado en la tarjeta
-    let paymentDate = new Date(now.getFullYear(), now.getMonth(), card.paymentDay)
-
-    // Si la fecha ya pasó este mes, usar el siguiente mes
-    if (paymentDate < now) {
-      paymentDate = new Date(now.getFullYear(), now.getMonth() + 1, card.paymentDay)
-    }
-
-    const daysUntilDue = Math.ceil((paymentDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    const daysUntilDue = Math.ceil(
+      (paymentDueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+    )
 
     let priority: 'urgent' | 'high' | 'medium' | 'low' = 'medium'
     if (daysUntilDue <= 3) priority = 'urgent'
     else if (daysUntilDue <= 7) priority = 'high'
+    else if (daysUntilDue <= 14) priority = 'medium'
+    else priority = 'low'
 
-    // Fecha sugerida de pago: 2 días antes del vencimiento
-    const suggestedDate = new Date(paymentDate)
+    // Fecha sugerida de pago: 2-3 días antes del vencimiento
+    const suggestedDate = new Date(paymentDueDate)
     suggestedDate.setDate(suggestedDate.getDate() - 2)
 
     // Si la fecha sugerida ya pasó, usar hoy
@@ -160,16 +290,17 @@ export default defineEventHandler(async (event) => {
       id: `card-${card.id}`,
       type: 'creditCard',
       name: `${card.name} - ${card.bank}`,
-      amount: totalCardExpenses,
-      dueDate: paymentDate.toISOString(),
+      amount: totalAmount,
+      dueDate: paymentDueDate.toISOString(),
       priority,
       reason:
         priority === 'urgent'
-          ? 'Vence en menos de 3 días - Evita intereses'
+          ? '🚨 Vence en menos de 3 días - Paga YA para evitar intereses y cargos'
           : priority === 'high'
-            ? 'Vence pronto - Paga antes para evitar intereses'
-            : 'Pago de tarjeta de crédito',
+            ? '⚠️ Vence pronto - Programa el pago antes para evitar intereses'
+            : `Pago de tarjeta - Ciclo cierra y se debe pagar antes del vencimiento`,
       interestRate: card.interestRate,
+      remainingBalance: totalAmount,
       suggestedPaymentDate: finalSuggestedDate.toISOString(),
     })
   })
@@ -230,64 +361,115 @@ export default defineEventHandler(async (event) => {
   })
 
   // Calcular totales
+  const totalIncome = totalReceivedIncome + pendingRecurringIncome
   const totalObligations = suggestions.reduce((sum, s) => sum + s.amount, 0)
   const suggestedSafetyBuffer = totalIncome * 0.1 // 10% de los ingresos como colchón
-  const availableBalance = currentBalance - suggestedSafetyBuffer
+  const availableAfterObligations = projectedAvailableBalance - totalObligations
 
   // Determinar estado del flujo de caja
   let cashFlowStatus: 'healthy' | 'tight' | 'deficit'
-  if (availableBalance > totalObligations * 1.2) cashFlowStatus = 'healthy'
-  else if (availableBalance > totalObligations) cashFlowStatus = 'tight'
+  if (availableAfterObligations > suggestedSafetyBuffer) cashFlowStatus = 'healthy'
+  else if (availableAfterObligations >= 0) cashFlowStatus = 'tight'
   else cashFlowStatus = 'deficit'
 
-  // Generar advertencias
+  // Generar advertencias inteligentes
   const warnings: string[] = []
+
   if (cashFlowStatus === 'deficit') {
+    const deficit = Math.abs(availableAfterObligations)
     warnings.push(
-      '⚠️ Tus obligaciones superan tu saldo disponible. Considera posponer gastos no esenciales.'
+      `🚨 ALERTA: Te faltan ${new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(deficit)} para cubrir todas tus obligaciones. Prioriza pagos urgentes.`
     )
   }
-  if (currentBalance < suggestedSafetyBuffer) {
-    warnings.push('⚠️ Tu saldo está por debajo del colchón de seguridad recomendado.')
+
+  if (pendingRecurringIncome > 0) {
+    warnings.push(
+      `💰 Tienes ${new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(pendingRecurringIncome)} de ingresos pendientes por recibir este mes (considerado en el plan).`
+    )
+  }
+
+  if (cashFlowStatus === 'tight') {
+    warnings.push(
+      '⚠️ Tu flujo de caja está ajustado. Evita gastos innecesarios hasta recibir más ingresos.'
+    )
+  }
+
+  if (currentBalance < suggestedSafetyBuffer && cashFlowStatus !== 'deficit') {
+    warnings.push(
+      `💡 Tu saldo actual está por debajo del colchón de seguridad recomendado (${new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(suggestedSafetyBuffer)}).`
+    )
   }
   if (suggestions.filter((s) => s.priority === 'urgent').length > 3) {
     warnings.push('⚠️ Tienes varios pagos urgentes. Prioriza los de mayor tasa de interés.')
   }
 
-  // Proyección de flujo de caja simplificada (próximos 30 días)
+  const highInterestDebts = suggestions.filter(
+    (s) => s.type === 'debt' && s.interestRate && s.interestRate > 20
+  )
+  if (highInterestDebts.length > 0) {
+    warnings.push(
+      `🔥 Tienes ${highInterestDebts.length} deuda(s) con interés mayor al 20%. Considera pagarlas prioritariamente.`
+    )
+  }
+
+  // Proyección de flujo de caja mejorada (próximos 30 días)
   const cashFlowProjection: any[] = []
   let runningBalance = currentBalance
 
-  for (let i = 0; i < 30; i++) {
+  // Agregar ingresos pendientes a la proyección
+  if (pendingRecurringIncome > 0) {
+    // Asumir que el ingreso recurrente llega a mitad/fin de mes
+    const estimatedIncomeDate = new Date(now.getFullYear(), now.getMonth(), 25)
+    if (estimatedIncomeDate > now) {
+      cashFlowProjection.push({
+        date: estimatedIncomeDate.toISOString().split('T')[0],
+        income: pendingRecurringIncome,
+        expenses: 0,
+        balance: runningBalance + pendingRecurringIncome,
+        payments: [],
+        type: 'income',
+      })
+      runningBalance += pendingRecurringIncome
+    }
+  }
+
+  // Proyectar pagos
+  for (let i = 0; i <= 30; i++) {
     const projectionDate = new Date(now.getTime() + i * 24 * 60 * 60 * 1000)
     const dayPayments = suggestions.filter((s) => {
       const suggDate = new Date(s.suggestedPaymentDate)
       return suggDate.toDateString() === projectionDate.toDateString()
     })
 
-    const dayExpenses = dayPayments.reduce((sum, p) => sum + p.amount, 0)
-    runningBalance -= dayExpenses
-
     if (dayPayments.length > 0) {
+      const dayExpenses = dayPayments.reduce((sum, p) => sum + p.amount, 0)
+      runningBalance -= dayExpenses
+
       cashFlowProjection.push({
         date: projectionDate.toISOString().split('T')[0],
         income: 0,
         expenses: dayExpenses,
         balance: runningBalance,
         payments: dayPayments,
+        type: 'expense',
       })
     }
   }
+
+  // Ordenar proyección por fecha
+  cashFlowProjection.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
   return {
     summary: {
       totalIncome,
       totalObligations,
-      availableBalance,
+      availableBalance: projectedAvailableBalance,
       currentBalance,
       suggestedSafetyBuffer,
       cashFlowStatus,
       warnings,
+      pendingIncome: pendingRecurringIncome,
+      projectedBalance: availableAfterObligations,
     },
     suggestions,
     cashFlowProjection,

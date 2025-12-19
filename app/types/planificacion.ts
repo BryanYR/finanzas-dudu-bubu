@@ -17,6 +17,7 @@ export interface CashFlowDay {
   expenses: number
   balance: number
   payments: PaymentSuggestion[]
+  type?: 'income' | 'expense'
 }
 
 export interface PaymentPlanSummary {
@@ -27,6 +28,8 @@ export interface PaymentPlanSummary {
   suggestedSafetyBuffer: number
   cashFlowStatus: 'healthy' | 'tight' | 'deficit'
   warnings: string[]
+  pendingIncome?: number
+  projectedBalance?: number
 }
 
 export interface PaymentPlan {

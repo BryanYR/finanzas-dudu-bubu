@@ -52,9 +52,13 @@ watch(creditCards, () => {
 // State
 const showFormModal = ref(false)
 const showDeleteModal = ref(false)
+const showPaymentModal = ref(false)
+const showPaymentHistoryModal = ref(false)
 const deleting = ref(false)
 const editingCard = ref<CreditCard | null>(null)
 const cardToDelete = ref<CreditCard | null>(null)
+const cardToPay = ref<{ card: CreditCard; suggestedAmount: number } | null>(null)
+const cardForHistory = ref<{ id: number; name: string } | null>(null)
 const filterActive = ref<'all' | 'active' | 'inactive'>('all')
 
 // Table columns
@@ -94,7 +98,22 @@ const openDeleteModal = (card: CreditCard) => {
   showDeleteModal.value = true
 }
 
+const openPaymentModal = (card: CreditCard, suggestedAmount: number) => {
+  cardToPay.value = { card, suggestedAmount }
+  showPaymentModal.value = true
+}
+
+const openPaymentHistoryModal = (card: CreditCard) => {
+  cardForHistory.value = { id: card.id, name: card.name }
+  showPaymentHistoryModal.value = true
+}
+
 const handleSave = async () => {
+  await refresh()
+  await loadStatements()
+}
+
+const handlePaymentSave = async () => {
   await refresh()
   await loadStatements()
 }
@@ -131,26 +150,6 @@ const formatCurrency = (amount: number) => {
 const formatDate = (dateString: string | undefined) => {
   if (!dateString) return ''
   return dayjs(dateString).format('DD MMM')
-}
-
-const getNextPaymentDate = (billingDay: number, paymentDay: number) => {
-  const today = dayjs()
-  const currentDay = today.date()
-
-  // Lógica simplificada: solo importa si ya pasó el día de pago este mes
-  // No importa la relación entre billingDay y paymentDay
-  if (currentDay < paymentDay) {
-    // El día de pago de este mes aún no ha llegado
-    return today.date(paymentDay)
-  } else {
-    // Ya pasó el día de pago de este mes, el próximo es el mes siguiente
-    return today.add(1, 'month').date(paymentDay)
-  }
-}
-
-const getDaysUntilPayment = (billingDay: number, paymentDay: number) => {
-  const paymentDate = getNextPaymentDate(billingDay, paymentDay)
-  return paymentDate.diff(dayjs(), 'days')
 }
 </script>
 
@@ -271,6 +270,20 @@ const getDaysUntilPayment = (billingDay: number, paymentDay: number) => {
             </div>
             <div class="flex gap-2">
               <button
+                @click="openPaymentHistoryModal(card)"
+                class="rounded-lg p-2 text-white/80 transition-colors hover:bg-white/20 hover:text-white"
+                title="Historial de Pagos"
+              >
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+                  />
+                </svg>
+              </button>
+              <button
                 @click="openEditModal(card)"
                 class="rounded-lg p-2 text-white/80 transition-colors hover:bg-white/20 hover:text-white"
                 title="Editar"
@@ -298,29 +311,33 @@ const getDaysUntilPayment = (billingDay: number, paymentDay: number) => {
             <div v-else-if="cardStatements[card.id]" class="space-y-4">
               <!-- Saldo pendiente -->
               <div class="rounded-lg bg-orange-50 p-4">
-                <p class="text-sm font-medium text-orange-800">Saldo del Periodo Actual</p>
+                <p class="text-sm font-medium text-orange-800">Deuda del Periodo Actual</p>
                 <p class="mt-1 text-3xl font-bold text-orange-900">
                   {{ formatCurrency(cardStatements[card.id]?.totalAmount ?? 0) }}
                 </p>
                 <div class="mt-3 flex items-center justify-between text-sm text-orange-700">
                   <span
-                    >Pagar antes del
-                    {{
-                      formatDate(
-                        getNextPaymentDate(card.billingDay, card.paymentDay).format('YYYY-MM-DD')
-                      )
-                    }}</span
+                    >Pagar antes del {{ formatDate(cardStatements[card.id]?.paymentDueDate) }}</span
                   >
                   <span
                     :class="
-                      getDaysUntilPayment(card.billingDay, card.paymentDay) <= 7
+                      dayjs(cardStatements[card.id]?.paymentDueDate).diff(dayjs(), 'days') <= 7
                         ? 'font-bold text-red-700'
                         : ''
                     "
                   >
-                    {{ getDaysUntilPayment(card.billingDay, card.paymentDay) }} días
+                    {{ dayjs(cardStatements[card.id]?.paymentDueDate).diff(dayjs(), 'days') }} días
                   </span>
                 </div>
+
+                <!-- Botón de pago -->
+                <button
+                  v-if="(cardStatements[card.id]?.totalAmount ?? 0) > 0"
+                  @click="openPaymentModal(card, cardStatements[card.id]?.totalAmount ?? 0)"
+                  class="mt-3 w-full rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-700"
+                >
+                  💳 Registrar Pago
+                </button>
               </div>
 
               <!-- Límite de crédito -->
@@ -500,5 +517,20 @@ const getDaysUntilPayment = (billingDay: number, paymentDay: number) => {
         </div>
       </template>
     </UiModal>
+
+    <!-- Payment Modal -->
+    <TarjetasCardPaymentModal
+      v-model:show="showPaymentModal"
+      :card="cardToPay?.card ?? null"
+      :suggested-amount="cardToPay?.suggestedAmount ?? 0"
+      @save="handlePaymentSave"
+    />
+
+    <!-- Payment History Modal -->
+    <TarjetasCardPaymentHistoryModal
+      v-model:show="showPaymentHistoryModal"
+      :card-id="cardForHistory?.id ?? null"
+      :card-name="cardForHistory?.name ?? ''"
+    />
   </div>
 </template>

@@ -6,6 +6,7 @@ export interface Debt {
   remainingAmount: number
   interestRate: number
   monthlyPayment: number
+  totalInstallments: number
   paymentDayOfMonth: number
   startDate: string
   endDate?: string

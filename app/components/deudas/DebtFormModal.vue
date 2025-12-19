@@ -7,6 +7,7 @@ interface Debt {
   remainingAmount: number
   interestRate: number
   monthlyPayment: number
+  totalInstallments: number
   paymentDayOfMonth: number
   startDate: string
   endDate?: string
@@ -33,6 +34,7 @@ const form = reactive({
   remainingAmount: 0,
   interestRate: 0,
   monthlyPayment: 0,
+  totalInstallments: 12,
   paymentDayOfMonth: 15,
   startDate: today(),
   endDate: '',
@@ -45,6 +47,7 @@ const resetForm = () => {
   form.remainingAmount = 0
   form.interestRate = 0
   form.monthlyPayment = 0
+  form.totalInstallments = 12
   form.paymentDayOfMonth = 15
   form.startDate = today()
   form.endDate = ''
@@ -61,6 +64,7 @@ watch(
       form.remainingAmount = newDebt.remainingAmount
       form.interestRate = newDebt.interestRate
       form.monthlyPayment = newDebt.monthlyPayment
+      form.totalInstallments = newDebt.totalInstallments || 12
       form.paymentDayOfMonth = newDebt.paymentDayOfMonth || 15
       form.startDate = newDebt.startDate?.split('T')[0] || today()
       form.endDate = (newDebt.endDate && newDebt.endDate.split('T')[0]) || ''
@@ -84,6 +88,7 @@ watch(
       form.remainingAmount = props.debt.remainingAmount
       form.interestRate = props.debt.interestRate
       form.monthlyPayment = props.debt.monthlyPayment
+      form.totalInstallments = props.debt.totalInstallments || 12
       form.paymentDayOfMonth = props.debt.paymentDayOfMonth || 15
       form.startDate = props.debt.startDate?.split('T')[0] || today()
       form.endDate = (props.debt.endDate && props.debt.endDate.split('T')[0]) || ''
@@ -111,6 +116,7 @@ const handleSave = async () => {
     remainingAmount: Number(form.remainingAmount),
     interestRate: Number(form.interestRate),
     monthlyPayment: Number(form.monthlyPayment),
+    totalInstallments: Number(form.totalInstallments),
     paymentDayOfMonth: Number(form.paymentDayOfMonth),
     startDate: toISOString(form.startDate),
     endDate: form.endDate ? toISOString(form.endDate) : undefined,
@@ -280,7 +286,8 @@ const handleSave = async () => {
           />
         </div>
       </div>
-      <!-- Día de pago mensual -->
+
+      <!-- Día de pago y número de cuotas -->
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <label for="paymentDayOfMonth" class="block text-sm font-medium text-gray-700">
@@ -297,6 +304,24 @@ const handleSave = async () => {
             placeholder="15"
           />
           <p class="mt-1 text-xs text-gray-500">Día del mes en que vence cada cuota (1-31)</p>
+        </div>
+
+        <!-- Número total de cuotas -->
+        <div>
+          <label for="totalInstallments" class="block text-sm font-medium text-gray-700">
+            Número total de cuotas <span class="text-red-500">*</span>
+          </label>
+          <input
+            id="totalInstallments"
+            v-model="form.totalInstallments"
+            type="number"
+            required
+            min="1"
+            step="1"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            placeholder="12"
+          />
+          <p class="mt-1 text-xs text-gray-500">Ej: 12, 24, 36 cuotas del préstamo</p>
         </div>
       </div>
 

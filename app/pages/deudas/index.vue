@@ -127,8 +127,11 @@ const formatCurrency = (amount: number) => {
 const { formatDate } = useDateFormatter()
 
 const getProgressPercentage = (debt: Debt) => {
-  const paid = debt.totalAmount - debt.remainingAmount
-  return Math.round((paid / debt.totalAmount) * 100)
+  const totalInstallments = debt.totalInstallments || 0
+  if (totalInstallments === 0) return 0
+
+  const paidInstallments = debt._count?.payments || 0
+  return Math.round((paidInstallments / totalInstallments) * 100)
 }
 
 // DataTable columns
@@ -137,10 +140,22 @@ const columns = [
   { key: 'creditor', label: 'Acreedor' },
   { key: 'amounts', label: 'Montos' },
   { key: 'monthlyPayment', label: 'Cuota' },
+  { key: 'installment', label: 'Progreso Cuotas' },
   { key: 'interestRate', label: 'Tasa' },
-  { key: 'progress', label: 'Progreso' },
+  { key: 'progress', label: 'Progreso Pago' },
   { key: 'actions', label: 'Acciones' },
 ]
+
+// Calcular el número total de cuotas (ahora desde la BD)
+const calculateTotalInstallments = (debt: Debt) => {
+  return debt.totalInstallments || 0
+}
+
+// Calcular cuota actual (número de pagos realizados + 1)
+const getCurrentInstallment = (debt: Debt) => {
+  const paymentsMade = debt._count?.payments || 0
+  return paymentsMade
+}
 </script>
 
 <template>
@@ -334,6 +349,17 @@ const columns = [
           <span class="font-semibold text-orange-600">
             {{ formatCurrency(item.monthlyPayment) }}
           </span>
+        </template>
+
+        <template #cell-installment="{ item }">
+          <div class="space-y-1">
+            <div class="text-sm font-medium text-gray-900">
+              Cuota {{ getCurrentInstallment(item) }} de {{ calculateTotalInstallments(item) }}
+            </div>
+            <div class="text-xs text-gray-500">
+              {{ item._count?.payments || 0 }} pago(s) realizados
+            </div>
+          </div>
         </template>
 
         <template #cell-interestRate="{ item }">

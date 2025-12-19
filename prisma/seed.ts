@@ -32,6 +32,41 @@ async function main() {
   })
   console.log('✅ Usuario creado:', user2.name, '-', user2.email)
 
+  // Crear categorías de ingresos para ambos usuarios
+  const incomeCategories = [
+    { name: 'Salario', icon: '💼', color: '#10b981' },
+    { name: 'Ingreso Variable', icon: '💰', color: '#f59e0b' },
+    { name: 'Freelance', icon: '💻', color: '#3b82f6' },
+    { name: 'Inversiones', icon: '📈', color: '#8b5cf6' },
+    { name: 'Otros Ingresos', icon: '💵', color: '#6b7280' },
+  ]
+
+  for (const user of [user1, user2]) {
+    for (const cat of incomeCategories) {
+      // Verificar si ya existe la categoría
+      const existing = await prisma.category.findFirst({
+        where: {
+          userId: user.id,
+          name: cat.name,
+          type: 'INCOME',
+        },
+      })
+
+      if (!existing) {
+        await prisma.category.create({
+          data: {
+            name: cat.name,
+            type: 'INCOME',
+            icon: cat.icon,
+            color: cat.color,
+            userId: user.id,
+          },
+        })
+      }
+    }
+    console.log(`✅ Categorías de ingresos creadas para ${user.name}`)
+  }
+
   console.log('🎉 Seed completado exitosamente!')
 }
 
