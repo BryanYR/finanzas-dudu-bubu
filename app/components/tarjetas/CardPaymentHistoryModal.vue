@@ -22,6 +22,8 @@ const emit = defineEmits<{
   (e: 'update:show', value: boolean): void
 }>()
 
+const { formatDate, formatCurrency } = useDateFormatter()
+
 const { $dayjs } = useNuxtApp()
 const dayjs = $dayjs as typeof import('dayjs')
 
@@ -55,17 +57,6 @@ const loadPaymentHistory = async () => {
   } finally {
     loading.value = false
   }
-}
-
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('es-EC', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)
-}
-
-const formatDate = (dateString: string) => {
-  return dayjs(dateString).format('DD/MM/YYYY')
 }
 
 const closeModal = () => {

@@ -172,13 +172,38 @@ model Debt {
   isPaid            Boolean   @default(false)
   userId            Int
 
-  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  payments DebtPayment[]
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments     DebtPayment[]
+  installments DebtInstallment[] // Cuotas programadas
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId, isPaid])
+}
+
+// ========== CUOTAS PROGRAMADAS DE DEUDAS ==========
+model DebtInstallment {
+  id                Int      @id @default(autoincrement())
+  installmentNumber Int // Número de cuota (1, 2, 3...)
+  dueDate           DateTime // Fecha de vencimiento de esta cuota
+  amount            Float // Monto de la cuota
+  principal         Float // Capital programado
+  interest          Float // Interés programado
+  insurance         Float    @default(0) // Seguro programado
+  status            String   @default("pending") // "pending" | "paid" | "overdue" | "advanced"
+  debtId            Int
+  debtPaymentId     Int? // Vinculación con el pago realizado (si ya se pagó)
+
+  debt        Debt         @relation(fields: [debtId], references: [id], onDelete: Cascade)
+  debtPayment DebtPayment? @relation(fields: [debtPaymentId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([debtId, installmentNumber]) // Asegurar que no haya cuotas duplicadas
+  @@index([debtId, status])
+  @@index([dueDate, status])
 }
 
 // ========== PAGOS DE DEUDAS ==========
@@ -193,7 +218,8 @@ model DebtPayment {
   notes         String?
   debtId        Int
 
-  debt Debt @relation(fields: [debtId], references: [id], onDelete: Cascade)
+  debt         Debt              @relation(fields: [debtId], references: [id], onDelete: Cascade)
+  installments DebtInstallment[] // Cuotas que cubre este pago (puede ser más de una si se adelantaron)
 
   createdAt DateTime @default(now())
 

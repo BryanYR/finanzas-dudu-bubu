@@ -71,14 +71,7 @@ const totalInsurance = computed(() => {
   return payments.value.reduce((sum, p) => sum + p.insurance, 0)
 })
 
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('es-EC', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)
-}
-
-const { formatDate } = useDateFormatter()
+const { formatDate, formatCurrency } = useDateFormatter()
 </script>
 
 <template>

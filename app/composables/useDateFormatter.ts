@@ -37,6 +37,13 @@ export const useDateFormatter = () => {
     return dayjs().format('YYYY-MM-DD')
   }
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-EC', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount)
+  }
+
   return {
     formatDate,
     formatDateShort,
@@ -45,5 +52,6 @@ export const useDateFormatter = () => {
     diffDays,
     toISOString,
     today,
+    formatCurrency,
   }
 }

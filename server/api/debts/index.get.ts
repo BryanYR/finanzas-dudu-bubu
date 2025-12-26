@@ -9,7 +9,21 @@ export default defineEventHandler(async (event) => {
     where: { userId: user.id },
     include: {
       _count: {
-        select: { payments: true },
+        select: {
+          payments: true,
+          installments: true,
+        },
+      },
+      installments: {
+        where: {
+          status: {
+            in: ['pending', 'overdue'],
+          },
+        },
+        orderBy: {
+          dueDate: 'asc',
+        },
+        take: 1, // Solo la próxima cuota pendiente
       },
     },
     orderBy: [{ isPaid: 'asc' }, { startDate: 'desc' }],

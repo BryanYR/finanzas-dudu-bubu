@@ -57,18 +57,21 @@ export default defineEventHandler(async (event) => {
   // Total disponible = saldo actual + ingresos pendientes del mes
   const projectedAvailableBalance = currentBalance + pendingRecurringIncome
 
-  // Obtener deudas activas con sus pagos
+  // Obtener deudas activas con sus cuotas
   const activeDebts = await prisma.debt.findMany({
     where: {
       userId: user.id,
       isPaid: false,
     },
     include: {
-      payments: {
-        orderBy: {
-          date: 'desc',
+      installments: {
+        where: {
+          OR: [{ status: 'pending' }, { status: 'overdue' }],
         },
-        take: 1, // Solo el último pago
+        orderBy: {
+          dueDate: 'asc',
+        },
+        take: 2, // Obtener las próximas 2 cuotas pendientes
       },
     },
   })
@@ -203,41 +206,33 @@ export default defineEventHandler(async (event) => {
   // Crear sugerencias de pago
   const suggestions: any[] = []
 
-  // 1. Deudas - priorizar por tasa de interés y fecha de pago
+  // 1. Deudas - usar cuotas programadas
   activeDebts.forEach((debt) => {
-    let dueDate: Date
+    // Obtener la próxima cuota pendiente
+    const nextInstallment = debt.installments?.[0]
 
-    // Si hay pagos realizados, calcular en base al último pago
-    if (debt.payments && debt.payments.length > 0 && debt.payments[0]) {
-      const lastPaymentDate = new Date(debt.payments[0].date)
+    if (!nextInstallment) return // No hay cuotas pendientes
 
-      // La próxima cuota es el mismo día del mes siguiente
-      dueDate = new Date(
-        lastPaymentDate.getFullYear(),
-        lastPaymentDate.getMonth() + 1,
-        debt.paymentDayOfMonth
-      )
-
-      // Si ya pasó esa fecha, calcular para el siguiente mes
-      if (dueDate < now) {
-        dueDate = new Date(now.getFullYear(), now.getMonth() + 1, debt.paymentDayOfMonth)
-      }
-    } else {
-      // Si no hay pagos, usar el día de pago configurado en la deuda
-      dueDate = new Date(now.getFullYear(), now.getMonth(), debt.paymentDayOfMonth)
-
-      // Si la fecha ya pasó este mes, usar el siguiente mes
-      if (dueDate < now) {
-        dueDate = new Date(now.getFullYear(), now.getMonth() + 1, debt.paymentDayOfMonth)
-      }
-    }
-
+    const dueDate = new Date(nextInstallment.dueDate)
     const daysUntilDue = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 
+    // Determinar prioridad
     let priority: 'urgent' | 'high' | 'medium' | 'low' = 'medium'
-    if (daysUntilDue <= 3) priority = 'urgent'
-    else if (daysUntilDue <= 7) priority = 'high'
-    else if (debt.interestRate > 15) priority = 'high'
+    let reason = 'Pago mensual regular'
+
+    if (nextInstallment.status === 'overdue') {
+      priority = 'urgent'
+      reason = '🚨 VENCIDA - Paga inmediatamente para evitar más cargos'
+    } else if (daysUntilDue <= 3) {
+      priority = 'urgent'
+      reason = '⚠️ Vence en menos de 3 días'
+    } else if (daysUntilDue <= 7) {
+      priority = 'high'
+      reason = 'Vence esta semana'
+    } else if (debt.interestRate > 15) {
+      priority = 'high'
+      reason = `Alta tasa de interés (${debt.interestRate}%)`
+    }
 
     // Fecha sugerida de pago: 2 días antes del vencimiento
     const suggestedDate = new Date(dueDate)
@@ -247,21 +242,18 @@ export default defineEventHandler(async (event) => {
     const finalSuggestedDate = suggestedDate < now ? now : suggestedDate
 
     suggestions.push({
-      id: `debt-${debt.id}`,
+      id: `debt-${debt.id}-installment-${nextInstallment.id}`,
       type: 'debt',
-      name: debt.name,
-      amount: debt.monthlyPayment,
+      name: `${debt.name} - Cuota ${nextInstallment.installmentNumber}/${debt.totalInstallments}`,
+      amount: nextInstallment.amount,
       dueDate: dueDate.toISOString(),
       priority,
-      reason:
-        priority === 'urgent'
-          ? 'Vence en menos de 3 días'
-          : priority === 'high' && debt.interestRate > 15
-            ? `Alta tasa de interés (${debt.interestRate}%)`
-            : 'Pago mensual regular',
+      reason,
       interestRate: debt.interestRate,
       remainingBalance: debt.remainingAmount,
       suggestedPaymentDate: finalSuggestedDate.toISOString(),
+      installmentNumber: nextInstallment.installmentNumber,
+      installmentId: nextInstallment.id,
     })
   })
 

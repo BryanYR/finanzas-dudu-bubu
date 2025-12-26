@@ -9,6 +9,8 @@ export interface PaymentSuggestion {
   interestRate?: number
   remainingBalance?: number
   suggestedPaymentDate: string
+  installmentNumber?: number
+  installmentId?: number
 }
 
 export interface CashFlowDay {

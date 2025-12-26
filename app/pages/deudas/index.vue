@@ -11,6 +11,7 @@ const loading = ref(false)
 const showDebtModal = ref(false)
 const showPaymentModal = ref(false)
 const showHistoryModal = ref(false)
+const showInstallmentsModal = ref(false)
 const editingDebt = ref<Debt | null>(null)
 const selectedDebt = ref<Debt | null>(null)
 const filterType = ref('all') // all, active, paid
@@ -106,6 +107,11 @@ const handleRegisterPayment = (debt: Debt) => {
 const handleViewHistory = (debt: Debt) => {
   selectedDebt.value = debt
   showHistoryModal.value = true
+}
+
+const handleViewInstallments = (debt: Debt) => {
+  selectedDebt.value = debt
+  showInstallmentsModal.value = true
 }
 
 const handleSave = async () => {
@@ -391,6 +397,20 @@ const getCurrentInstallment = (debt: Debt) => {
         <template #cell-actions="{ item }">
           <div class="flex gap-2">
             <button
+              @click="handleViewInstallments(item)"
+              class="rounded-lg p-2 text-purple-600 transition-colors hover:bg-purple-50"
+              title="Ver cuotas programadas"
+            >
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+                />
+              </svg>
+            </button>
+            <button
               v-if="!item.isPaid"
               @click="handleRegisterPayment(item)"
               class="rounded-lg p-2 text-green-600 transition-colors hover:bg-green-50"
@@ -497,5 +517,12 @@ const getCurrentInstallment = (debt: Debt) => {
     />
 
     <DeudasDebtHistoryModal v-model:show="showHistoryModal" :debt="selectedDebt" />
+
+    <DeudasDebtInstallmentsModal
+      :show="showInstallmentsModal"
+      :debtId="selectedDebt?.id || 0"
+      :debtName="selectedDebt?.name || ''"
+      @close="showInstallmentsModal = false"
+    />
   </div>
 </template>
