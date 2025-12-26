@@ -27,4 +27,7 @@ export default defineNuxtConfig({
     '@components': resolve(__dirname, './app/components'),
     '#types': resolve(__dirname, './app/types'),
   },
+  nitro: {
+    preset: 'vercel',
+  },
 })
