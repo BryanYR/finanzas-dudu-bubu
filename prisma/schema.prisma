@@ -82,8 +82,11 @@ model Expense {
   userId        Int
   paymentMethod String   @default("cash") // "cash" | "debit" | "credit"
   creditCardId  Int? // Opcional: si se pagó con tarjeta de crédito
-  isPaidOff     Boolean  @default(false) // Para gastos con tarjeta: marca si el estado de cuenta ya fue pagado
-  notes         String?
+  isPaidOff           Boolean  @default(false) // Para gastos con tarjeta: marca si el estado de cuenta ya fue pagado
+  installments        Int?    // Número de cuotas (solo para tarjeta de crédito, null = pago único)
+  installmentAmount   Float?  // Cuota mensual real calculada (capital + interés / n)
+  totalWithInterest   Float?  // Total a pagar incluyendo intereses
+  notes               String?
 
   category   Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -107,8 +110,9 @@ model CreditCard {
   creditLimit  Float // Límite de crédito
   billingDay   Int // Día de corte (1-31)
   paymentDay   Int // Día de pago (1-31)
-  interestRate Float? // Tasa de interés anual (opcional)
-  isActive     Boolean @default(true)
+  interestRate    Float?  // TEA - Tasa Efectiva Anual (fallback para cálculo de cuotas)
+  installmentFees Json?   // {"2": 15.806, "3": 19.156, ...} - % interés total sobre capital por n cuotas
+  isActive        Boolean @default(true)
   userId       Int
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)

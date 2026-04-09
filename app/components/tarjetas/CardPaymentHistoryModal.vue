@@ -1,25 +1,13 @@
 <script setup lang="ts">
-interface Payment {
-  id: number
-  amount: number
-  date: string
-  description: string
-  category: {
-    id: number
-    name: string
-    color: string | null
-  } | null
-}
+import type { CardPayment } from '#types/tarjeta'
 
-interface Props {
+const props = defineProps<{
   show: boolean
   cardId: number | null
   cardName: string
-}
-
-const props = defineProps<Props>()
+}>()
 const emit = defineEmits<{
-  (e: 'update:show', value: boolean): void
+  'update:show': [value: boolean]
 }>()
 
 const { formatDate, formatCurrency } = useDateFormatter()
@@ -28,7 +16,7 @@ const { $dayjs } = useNuxtApp()
 const dayjs = $dayjs as typeof import('dayjs')
 
 // Data
-const payments = ref<Payment[]>([])
+const payments = ref<CardPayment[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
 

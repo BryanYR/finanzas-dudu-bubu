@@ -1,11 +1,5 @@
 <script setup lang="ts">
-interface Category {
-  id?: number
-  name: string
-  type: string
-  icon?: string
-  color?: string
-}
+import type { Category } from '#types/categoria'
 
 const props = defineProps<{
   category?: Category | null
@@ -103,7 +97,7 @@ const handleSave = async () => {
     setTimeout(() => resetForm(), 300)
   } catch (err) {
     console.error('Error al guardar categoría:', err)
-    alert('Error al guardar la categoría')
+    useToast().error('Error al guardar la categoría')
   } finally {
     saving.value = false
   }

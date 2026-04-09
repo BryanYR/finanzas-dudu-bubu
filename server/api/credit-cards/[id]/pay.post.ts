@@ -1,9 +1,9 @@
 import { prisma } from '@server/utils/db'
-import { getUserFromSession } from '@server/utils/auth'
+import { requireUser } from '@server/utils/auth'
+import { computeBillingWindows } from '@server/services/creditCardService'
 
 export default defineEventHandler(async (event) => {
-  const user = await getUserFromSession(event)
-  if (!user) throw createError({ statusCode: 401 })
+  const user = await requireUser(event)
 
   const id = Number(event.context.params?.id)
   const body = await readBody(event)
@@ -13,51 +13,32 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'Tarjeta no encontrada' })
   }
 
-  // Calcular el período que se está pagando (el último cerrado)
-  const now = new Date()
-  const currentDay = now.getDate()
+  // Obtener el período cerrado usando la misma lógica del servicio
+  const { lastClosed } = computeBillingWindows(card)
 
-  let billingStartDate: Date
-  let billingEndDate: Date
-
-  if (currentDay <= card.billingDay) {
-    // Período cerrado: del mes anterior
-    billingStartDate = new Date(now.getFullYear(), now.getMonth() - 1, card.billingDay + 1, 0, 0, 0)
-    billingEndDate = new Date(now.getFullYear(), now.getMonth(), card.billingDay, 23, 59, 59)
-  } else {
-    // Período cerrado: del mes anterior (porque ya pasó el corte de este mes)
-    billingStartDate = new Date(now.getFullYear(), now.getMonth() - 1, card.billingDay + 1, 0, 0, 0)
-    billingEndDate = new Date(now.getFullYear(), now.getMonth(), card.billingDay, 23, 59, 59)
-  }
-
-  // Marcar todos los gastos de este período como pagados
+  // Marcar todos los gastos del período cerrado como pagados
   await prisma.expense.updateMany({
     where: {
       userId: user.id,
       creditCardId: id,
-      date: {
-        gte: billingStartDate,
-        lte: billingEndDate,
-      },
-      isPaidOff: false, // Solo los que no han sido marcados
+      date: { gte: lastClosed.start, lte: lastClosed.end },
+      isPaidOff: false,
     },
-    data: {
-      isPaidOff: true,
-    },
+    data: { isPaidOff: true },
   })
 
-  // Crear un gasto que representa el pago de la tarjeta (sale de tu cuenta)
+  // Registrar el pago como un gasto de débito (sale de la cuenta bancaria)
   await prisma.expense.create({
     data: {
       description: `Pago Tarjeta ${card.name} - ${card.bank}`,
       amount: body.amount,
       date: body.date ? new Date(body.date) : new Date(),
       isRecurring: false,
-      paymentMethod: 'debit', // El pago sale de tu cuenta
-      creditCardId: null, // No es un gasto con tarjeta, es EL PAGO de la tarjeta
-      categoryId: body.categoryId, // Categoría para pagos de tarjetas
+      paymentMethod: 'debit',
+      creditCardId: null,
+      categoryId: body.categoryId,
       userId: user.id,
-      isPaidOff: false, // Este es un gasto de cuenta bancaria, no de tarjeta
+      isPaidOff: false,
     },
   })
 

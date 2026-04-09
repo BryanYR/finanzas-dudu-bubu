@@ -1,15 +1,12 @@
 export default defineNuxtRouteMiddleware(async (to) => {
-  // No aplicar middleware en la página de login
-  if (to.path === '/login') {
-    return
-  }
+  if (to.path === '/login') return
 
-  // Verificar autenticación en el servidor
-  if (process.server) {
-    try {
-      await $fetch('/api/auth/me')
-    } catch (error) {
-      return navigateTo('/login')
-    }
+  try {
+    // En SSR hay que reenviar las cookies del navegador manualmente,
+    // porque $fetch del servidor no las incluye automáticamente.
+    const headers = process.server ? useRequestHeaders(['cookie']) : undefined
+    await $fetch('/api/auth/me', { headers })
+  } catch {
+    return navigateTo('/login')
   }
 })

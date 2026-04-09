@@ -1,48 +1,50 @@
 import { prisma } from '@server/utils/db'
-import { getUserFromSession } from '@server/utils/auth'
+import { requireUser } from '@server/utils/auth'
+
+function buildCreditCardFields(body: Record<string, unknown>) {
+  if (body.paymentMethod === 'credit' && body.creditCardId) {
+    return {
+      creditCardId: body.creditCardId as number,
+      installments: (body.installments as number) > 1 ? (body.installments as number) : null,
+      installmentAmount: (body.installmentAmount as number) > 0 ? (body.installmentAmount as number) : null,
+      totalWithInterest: (body.totalWithInterest as number) > 0 ? (body.totalWithInterest as number) : null,
+    }
+  }
+  if (body.paymentMethod !== 'credit') {
+    return { creditCardId: null, installments: null, installmentAmount: null, totalWithInterest: null }
+  }
+  return {}
+}
+
+function buildUpdateData(body: Record<string, unknown>) {
+  const data: Record<string, unknown> = {}
+
+  if (body.amount !== undefined) data.amount = body.amount
+  if (body.description !== undefined) data.description = body.description
+  if (body.date) data.date = new Date(body.date as string)
+  if (body.isRecurring !== undefined) data.isRecurring = body.isRecurring
+  if (body.categoryId !== undefined) data.categoryId = body.categoryId
+  if (body.paymentMethod !== undefined) data.paymentMethod = body.paymentMethod
+  if (body.notes !== undefined) data.notes = (body.notes as string) || null
+
+  if (body.frequency) {
+    data.frequency = body.frequency
+  } else if (body.isRecurring === false) {
+    data.frequency = null
+  }
+
+  return { ...data, ...buildCreditCardFields(body) }
+}
 
 export default defineEventHandler(async (event) => {
-  const user = await getUserFromSession(event)
-  if (!user) throw createError({ statusCode: 401 })
-
+  const user = await requireUser(event)
   const id = Number(event.context.params?.id)
   const body = await readBody(event)
 
   const expense = await prisma.expense.findUnique({ where: { id } })
-  if (!expense || expense.userId !== user.id) {
+  if (expense?.userId !== user.id) {
     throw createError({ statusCode: 404, message: 'Gasto no encontrado' })
   }
 
-  // Build update data conditionally to avoid undefined values
-  const updateData: any = {}
-
-  if (body.amount !== undefined) updateData.amount = body.amount
-  if (body.description !== undefined) updateData.description = body.description
-  if (body.date) updateData.date = new Date(body.date)
-  if (body.isRecurring !== undefined) updateData.isRecurring = body.isRecurring
-  if (body.categoryId !== undefined) updateData.categoryId = body.categoryId
-  if (body.paymentMethod !== undefined) updateData.paymentMethod = body.paymentMethod
-
-  // Handle optional fields
-  if (body.frequency) {
-    updateData.frequency = body.frequency
-  } else if (body.isRecurring === false) {
-    updateData.frequency = null
-  }
-
-  if (body.notes !== undefined) {
-    updateData.notes = body.notes || null
-  }
-
-  // Handle credit card - only set if payment method is credit
-  if (body.paymentMethod === 'credit' && body.creditCardId) {
-    updateData.creditCardId = body.creditCardId
-  } else if (body.paymentMethod !== 'credit') {
-    updateData.creditCardId = null
-  }
-
-  return prisma.expense.update({
-    where: { id },
-    data: updateData,
-  })
+  return prisma.expense.update({ where: { id }, data: buildUpdateData(body) })
 })

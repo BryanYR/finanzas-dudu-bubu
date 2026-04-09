@@ -1,579 +1,450 @@
 <script setup lang="ts">
-import type { PaymentPlan, PaymentSuggestion } from '#types/planificacion'
-import RefreshIcon from '@components/icons/common/RefreshIcon.vue'
-import ChartBarIcon from '@components/icons/planificacion/ChartBarIcon.vue'
-import WalletIcon from '@components/icons/dashboard/WalletIcon.vue'
+import type { PaymentPlan, PaymentSuggestion, CashFlowDay } from '#types/planificacion'
 
-definePageMeta({
-  layout: 'default',
+definePageMeta({ layout: 'default' })
+
+const { formatDate, formatCurrency } = useDateFormatter()
+const { data: paymentPlan, pending, error, refresh } = await useFetchAuth<PaymentPlan>('/api/payment-plan/suggestions')
+
+const refreshing = ref(false)
+const doRefresh = async () => {
+  refreshing.value = true
+  try { await refresh() } finally { refreshing.value = false }
+}
+
+// ── Config maps ────────────────────────────────────────────────────────────────
+
+const statusConfig = {
+  healthy: {
+    label: 'Saludable',
+    gradient: 'from-emerald-600 via-emerald-700 to-teal-800',
+    barColor: 'bg-emerald-400',
+  },
+  tight: {
+    label: 'Ajustado',
+    gradient: 'from-amber-500 via-orange-500 to-orange-700',
+    barColor: 'bg-amber-300',
+  },
+  deficit: {
+    label: 'Déficit',
+    gradient: 'from-red-600 via-red-700 to-rose-800',
+    barColor: 'bg-red-400',
+  },
+} as const
+
+const priorityConfig = {
+  urgent: { label: 'Urgente', bar: 'bg-red-500',     badge: 'bg-red-100 text-red-700',     dot: 'bg-red-500'     },
+  high:   { label: 'Alta',    bar: 'bg-orange-500',   badge: 'bg-orange-100 text-orange-700', dot: 'bg-orange-500'  },
+  medium: { label: 'Media',   bar: 'bg-amber-400',    badge: 'bg-amber-100 text-amber-700',   dot: 'bg-amber-400'   },
+  low:    { label: 'Baja',    bar: 'bg-emerald-500',  badge: 'bg-emerald-100 text-emerald-700',dot: 'bg-emerald-500'},
+} as const
+
+const typeLabel: Record<string, string> = {
+  debt: 'Deuda',
+  creditCard: 'Tarjeta',
+  expense: 'Gasto Fijo',
+}
+
+const typeBadge: Record<string, string> = {
+  debt: 'bg-purple-100 text-purple-700',
+  creditCard: 'bg-indigo-100 text-indigo-700',
+  expense: 'bg-gray-100 text-gray-600',
+}
+
+// ── Computed ───────────────────────────────────────────────────────────────────
+
+const status = computed(() => paymentPlan.value?.summary.cashFlowStatus ?? 'healthy')
+const cfg = computed(() => statusConfig[status.value])
+
+const urgentSuggestions = computed(() =>
+  paymentPlan.value?.suggestions.filter((s) => s.priority === 'urgent') ?? [],
+)
+const highSuggestions = computed(() =>
+  paymentPlan.value?.suggestions.filter((s) => s.priority === 'high') ?? [],
+)
+const restSuggestions = computed(() =>
+  paymentPlan.value?.suggestions.filter(
+    (s) => s.priority === 'medium' || s.priority === 'low',
+  ) ?? [],
+)
+
+// How much of obligations can be covered by available balance (capped at 100%)
+const coveragePct = computed(() => {
+  const plan = paymentPlan.value
+  if (!plan || plan.summary.totalObligations === 0) return 100
+  return Math.min(100, (plan.summary.availableBalance / plan.summary.totalObligations) * 100)
 })
 
-// Data fetching
-const {
-  data: paymentPlan,
-  pending,
-  error,
-  refresh,
-} = await useFetchAuth<PaymentPlan>('/api/payment-plan/suggestions')
+const daysUntilDue = (dateStr: string) =>
+  Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86_400_000)
 
-const { formatDate } = useDateFormatter()
-
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('es-EC', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)
-}
-
-const getPriorityColor = (priority: string) => {
-  switch (priority) {
-    case 'urgent':
-      return 'bg-red-100 text-red-800 border-red-300'
-    case 'high':
-      return 'bg-orange-100 text-orange-800 border-orange-300'
-    case 'medium':
-      return 'bg-yellow-100 text-yellow-800 border-yellow-300'
-    case 'low':
-      return 'bg-green-100 text-green-800 border-green-300'
-    default:
-      return 'bg-gray-100 text-gray-800 border-gray-300'
-  }
-}
-
-const getPriorityIcon = (priority: string) => {
-  switch (priority) {
-    case 'urgent':
-      return '🔴'
-    case 'high':
-      return '🟠'
-    case 'medium':
-      return '🟡'
-    case 'low':
-      return '🟢'
-    default:
-      return '⚪'
-  }
-}
-
-const getTypeLabel = (type: string) => {
-  switch (type) {
-    case 'debt':
-      return 'Deuda'
-    case 'creditCard':
-      return 'Tarjeta'
-    case 'expense':
-      return 'Gasto Fijo'
-    default:
-      return type
-  }
-}
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'healthy':
-      return 'from-green-500 to-green-600'
-    case 'tight':
-      return 'from-yellow-500 to-yellow-600'
-    case 'deficit':
-      return 'from-red-500 to-red-600'
-    default:
-      return 'from-gray-500 to-gray-600'
-  }
-}
-
-const getStatusText = (status: string) => {
-  switch (status) {
-    case 'healthy':
-      return 'Saludable'
-    case 'tight':
-      return 'Ajustado'
-    case 'deficit':
-      return 'Déficit'
-    default:
-      return status
-  }
+const dueDateLabel = (dateStr: string) => {
+  const days = daysUntilDue(dateStr)
+  if (days < 0) return { text: 'Vencida', cls: 'text-red-600 font-bold' }
+  if (days === 0) return { text: 'Hoy', cls: 'text-red-600 font-bold' }
+  if (days === 1) return { text: 'Mañana', cls: 'text-orange-600 font-semibold' }
+  if (days <= 3) return { text: `${days} días`, cls: 'text-orange-600 font-semibold' }
+  if (days <= 7) return { text: `${days} días`, cls: 'text-amber-600' }
+  return { text: `${days} días`, cls: 'text-gray-500' }
 }
 </script>
 
 <template>
-  <div class="space-y-6 p-6">
+  <div class="mx-auto max-w-5xl space-y-5">
     <!-- Header -->
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div class="flex items-start justify-between gap-3">
       <div>
-        <h1 class="text-3xl font-bold text-gray-900">Planificación de Pagos</h1>
-        <p class="mt-1 text-sm text-gray-600">Optimiza tus pagos y mantén tu salud financiera</p>
+        <h1 class="text-xl font-bold text-gray-900 lg:text-2xl">Planificación</h1>
+        <p class="text-sm text-gray-500">Optimiza tus pagos según tus ingresos disponibles</p>
       </div>
-      <UiButton @click="refresh()" variant="outline" :loading="pending">
-        <RefreshIcon custom-class="mr-2" />
+      <button
+        @click="doRefresh"
+        :disabled="refreshing || pending"
+        class="flex h-10 items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm transition hover:bg-gray-50 disabled:opacity-50"
+      >
+        <svg
+          class="h-4 w-4"
+          :class="(refreshing || pending) ? 'animate-spin' : ''"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
         Actualizar
-      </UiButton>
+      </button>
     </div>
 
-    <div v-if="pending" class="flex items-center justify-center py-12">
-      <div class="text-center">
-        <div
-          class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent"
-        ></div>
-        <p class="mt-2 text-sm text-gray-600">Calculando plan de pagos...</p>
-      </div>
+    <!-- Loading -->
+    <div v-if="pending" class="flex flex-col items-center justify-center py-20 text-center">
+      <div class="border-3 h-10 w-10 animate-spin rounded-full border-indigo-500 border-t-transparent"></div>
+      <p class="mt-3 text-sm text-gray-500">Calculando plan de pagos...</p>
     </div>
 
-    <div v-else-if="error" class="rounded-lg bg-red-50 p-4">
-      <p class="text-red-800">Error al cargar el plan de pagos</p>
+    <!-- Error -->
+    <div v-else-if="error" class="rounded-2xl bg-red-50 p-4 text-sm text-red-700">
+      Error al cargar el plan de pagos: {{ error.message }}
     </div>
 
-    <div v-else-if="paymentPlan" class="space-y-6">
-      <!-- Resumen General -->
-      <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <!-- Estado del Flujo -->
-        <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <div class="flex items-center justify-between">
+    <template v-else-if="paymentPlan">
+
+      <!-- ── Salud financiera (card principal) ─────────────────────────────── -->
+      <div
+        class="relative overflow-hidden rounded-2xl p-5 text-white shadow-lg"
+        :class="`bg-gradient-to-br ${cfg.gradient}`"
+      >
+        <!-- Decorativos -->
+        <div class="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/10" />
+        <div class="absolute -bottom-6 right-24 h-24 w-24 rounded-full bg-white/10" />
+
+        <div class="relative">
+          <!-- Fila superior -->
+          <div class="flex items-start justify-between gap-4">
             <div>
-              <p class="text-sm font-medium text-gray-600">Estado del Flujo</p>
+              <p class="text-xs font-semibold uppercase tracking-widest text-white/60">Estado financiero</p>
+              <p class="mt-0.5 text-2xl font-bold">{{ cfg.label }}</p>
+              <p class="mt-3 text-xs text-white/60">Saldo proyectado tras pagos</p>
               <p
-                :class="[
-                  'mt-2 text-2xl font-bold',
-                  paymentPlan.summary.cashFlowStatus === 'healthy'
-                    ? 'text-green-600'
-                    : paymentPlan.summary.cashFlowStatus === 'tight'
-                      ? 'text-yellow-600'
-                      : 'text-red-600',
-                ]"
-              >
-                {{ getStatusText(paymentPlan.summary.cashFlowStatus) }}
-              </p>
-            </div>
-            <div
-              :class="[
-                'rounded-full bg-gradient-to-br p-3',
-                getStatusColor(paymentPlan.summary.cashFlowStatus),
-              ]"
-            >
-              <ChartBarIcon custom-class="text-white" />
-            </div>
-          </div>
-        </div>
-
-        <!-- Saldo Actual -->
-        <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <div class="flex items-center justify-between">
-            <div class="w-full">
-              <p class="text-sm font-medium text-gray-600">Saldo Actual</p>
-              <p class="mt-2 text-2xl font-bold text-blue-600">
-                {{ formatCurrency(paymentPlan.summary.currentBalance) }}
-              </p>
-              <div class="mt-2 space-y-1">
-                <p
-                  v-if="paymentPlan.summary.pendingIncome && paymentPlan.summary.pendingIncome > 0"
-                  class="text-xs font-semibold text-green-600"
-                >
-                  + {{ formatCurrency(paymentPlan.summary.pendingIncome) }} pendiente
-                </p>
-                <p class="text-xs text-gray-500">
-                  = {{ formatCurrency(paymentPlan.summary.availableBalance) }} disponible
-                </p>
-              </div>
-            </div>
-            <div class="rounded-full bg-blue-100 p-3">
-              <WalletIcon custom-class="text-blue-600" />
-            </div>
-          </div>
-        </div>
-
-        <!-- Total Obligaciones -->
-        <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-gray-600">Total Obligaciones</p>
-              <p class="mt-2 text-2xl font-bold text-orange-600">
-                {{ formatCurrency(paymentPlan.summary.totalObligations) }}
-              </p>
-              <p class="mt-1 text-xs text-gray-500">
-                {{ paymentPlan.suggestions.length }} pagos pendientes
-              </p>
-            </div>
-            <div class="rounded-full bg-orange-100 p-3">
-              <svg
-                class="h-8 w-8 text-orange-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        <!-- Saldo Proyectado -->
-        <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-gray-600">Saldo Proyectado</p>
-              <p
-                class="mt-2 text-2xl font-bold"
-                :class="
-                  paymentPlan.summary.projectedBalance && paymentPlan.summary.projectedBalance >= 0
-                    ? 'text-green-600'
-                    : 'text-red-600'
-                "
+                class="text-3xl font-bold tracking-tight"
+                :class="(paymentPlan.summary.projectedBalance ?? 0) < 0 ? 'text-red-300' : 'text-white'"
               >
                 {{ formatCurrency(paymentPlan.summary.projectedBalance ?? 0) }}
               </p>
-              <p class="mt-1 text-xs text-gray-500">Después de pagos</p>
             </div>
-            <div class="rounded-full bg-purple-100 p-3">
-              <svg
-                class="h-8 w-8 text-purple-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                />
-              </svg>
+            <div class="shrink-0 text-right">
+              <p class="text-xs text-white/60">Ingresos disponibles</p>
+              <p class="text-xl font-bold">{{ formatCurrency(paymentPlan.summary.availableBalance) }}</p>
+              <p class="mt-1 text-xs text-white/60">Total obligaciones</p>
+              <p class="text-xl font-bold">{{ formatCurrency(paymentPlan.summary.totalObligations) }}</p>
+            </div>
+          </div>
+
+          <!-- Barra de cobertura -->
+          <div class="mt-4">
+            <div class="mb-1 flex justify-between text-xs text-white/70">
+              <span>Cobertura de obligaciones</span>
+              <span class="font-semibold text-white">{{ coveragePct.toFixed(0) }}%</span>
+            </div>
+            <div class="h-2.5 overflow-hidden rounded-full bg-white/20">
+              <div
+                class="h-full rounded-full transition-all duration-700"
+                :class="cfg.barColor"
+                :style="{ width: coveragePct + '%' }"
+              ></div>
+            </div>
+          </div>
+
+          <!-- Mini stats -->
+          <div class="mt-4 flex flex-wrap gap-5">
+            <div>
+              <p class="text-lg font-bold">{{ paymentPlan.suggestions.length }}</p>
+              <p class="text-xs text-white/60">pagos pendientes</p>
+            </div>
+            <div>
+              <p class="text-lg font-bold">{{ formatCurrency(paymentPlan.summary.currentBalance) }}</p>
+              <p class="text-xs text-white/60">balance actual</p>
+            </div>
+            <div v-if="(paymentPlan.summary.pendingIncome ?? 0) > 0">
+              <p class="text-lg font-bold">{{ formatCurrency(paymentPlan.summary.pendingIncome ?? 0) }}</p>
+              <p class="text-xs text-white/60">ingresos esperados</p>
+            </div>
+            <div>
+              <p class="text-lg font-bold">{{ formatCurrency(paymentPlan.summary.suggestedSafetyBuffer) }}</p>
+              <p class="text-xs text-white/60">colchón sugerido</p>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Advertencias -->
+      <!-- ── Advertencias ───────────────────────────────────────────────────── -->
       <div
         v-if="paymentPlan.summary.warnings.length > 0"
-        class="rounded-lg border-l-4 border-yellow-400 bg-yellow-50 p-4"
+        class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100"
       >
-        <div class="flex">
-          <div class="flex-shrink-0">
-            <svg
-              class="h-5 w-5 text-yellow-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              />
-            </svg>
-          </div>
-          <div class="ml-3">
-            <h3 class="text-sm font-medium text-yellow-800">Análisis de tu Situación Financiera</h3>
-            <div class="mt-2 text-sm text-yellow-700">
-              <ul class="space-y-1">
-                <li
-                  v-for="(warning, idx) in paymentPlan.summary.warnings"
-                  :key="idx"
-                  class="flex items-start"
-                >
-                  <span class="mr-2 mt-0.5">•</span>
-                  <span>{{ warning }}</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Estrategia de Pago Sugerida -->
-      <div
-        class="rounded-lg border-2 border-indigo-200 bg-gradient-to-r from-indigo-50 to-blue-50 p-6"
-      >
-        <div class="flex items-start">
-          <div class="flex-shrink-0">
-            <svg
-              class="h-8 w-8 text-indigo-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-              />
-            </svg>
-          </div>
-          <div class="ml-4 flex-1">
-            <h3 class="text-lg font-bold text-indigo-900">📋 Estrategia de Pago Optimizada</h3>
-            <div class="mt-3 space-y-2 text-sm text-indigo-800">
-              <p class="font-medium">
-                Con tu saldo actual de
-                <span class="font-bold">{{
-                  formatCurrency(paymentPlan.summary.currentBalance)
-                }}</span>
-                <span
-                  v-if="paymentPlan.summary.pendingIncome && paymentPlan.summary.pendingIncome > 0"
-                >
-                  más
-                  <span class="font-bold text-green-700">{{
-                    formatCurrency(paymentPlan.summary.pendingIncome)
-                  }}</span>
-                  de ingresos esperados </span
-                >, puedes cubrir tus obligaciones siguiendo este plan:
-              </p>
-              <div class="mt-4 grid gap-3 md:grid-cols-3">
-                <div class="rounded-lg bg-white/80 p-3 shadow-sm">
-                  <p class="text-xs font-medium text-gray-600">PASO 1: Pagos Urgentes</p>
-                  <p class="mt-1 text-lg font-bold text-red-600">
-                    {{ paymentPlan.suggestions.filter((s) => s.priority === 'urgent').length }}
-                  </p>
-                  <p class="text-xs text-gray-600">Hacerlos HOY</p>
-                </div>
-                <div class="rounded-lg bg-white/80 p-3 shadow-sm">
-                  <p class="text-xs font-medium text-gray-600">PASO 2: Prioridad Alta</p>
-                  <p class="mt-1 text-lg font-bold text-orange-600">
-                    {{ paymentPlan.suggestions.filter((s) => s.priority === 'high').length }}
-                  </p>
-                  <p class="text-xs text-gray-600">Esta semana</p>
-                </div>
-                <div class="rounded-lg bg-white/80 p-3 shadow-sm">
-                  <p class="text-xs font-medium text-gray-600">PASO 3: Resto</p>
-                  <p class="mt-1 text-lg font-bold text-blue-600">
-                    {{
-                      paymentPlan.suggestions.filter(
-                        (s) => s.priority === 'medium' || s.priority === 'low'
-                      ).length
-                    }}
-                  </p>
-                  <p class="text-xs text-gray-600">Antes de vencimiento</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Sugerencias de Pagos -->
-      <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 class="mb-4 text-xl font-bold text-gray-900">
-          Plan de Pagos Sugerido (Ordenado por Prioridad)
-        </h2>
-
-        <div class="space-y-4">
-          <div
-            v-for="(suggestion, idx) in paymentPlan.suggestions"
-            :key="suggestion.id"
-            class="rounded-lg border-2 bg-white p-4 transition-shadow hover:shadow-md"
-            :class="getPriorityColor(suggestion.priority)"
-          >
-            <div class="flex items-start justify-between">
-              <div class="flex-1">
-                <div class="flex items-center gap-2">
-                  <span class="text-2xl">{{ getPriorityIcon(suggestion.priority) }}</span>
-                  <div>
-                    <div class="flex items-center gap-2">
-                      <h3 class="font-semibold">{{ idx + 1 }}. {{ suggestion.name }}</h3>
-                      <span
-                        class="rounded-full px-2 py-0.5 text-xs font-semibold"
-                        :class="getPriorityColor(suggestion.priority)"
-                      >
-                        {{ getTypeLabel(suggestion.type) }}
-                      </span>
-                    </div>
-                    <p class="mt-1 text-sm">{{ suggestion.reason }}</p>
-                  </div>
-                </div>
-
-                <div class="mt-3 grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
-                  <div>
-                    <span class="font-medium">Monto:</span>
-                    <span class="ml-1 font-bold">{{ formatCurrency(suggestion.amount) }}</span>
-                  </div>
-                  <div>
-                    <span class="font-medium">Vence:</span>
-                    <span class="ml-1">{{ formatDate(suggestion.dueDate) }}</span>
-                  </div>
-                  <div>
-                    <span class="font-medium">Pagar en:</span>
-                    <span class="ml-1 font-semibold text-blue-600">{{
-                      formatDate(suggestion.suggestedPaymentDate)
-                    }}</span>
-                  </div>
-                  <div v-if="suggestion.interestRate">
-                    <span class="font-medium">Interés:</span>
-                    <span class="ml-1">{{ suggestion.interestRate }}%</span>
-                  </div>
-                </div>
-
-                <div v-if="suggestion.remainingBalance" class="mt-2 text-sm text-gray-600">
-                  <span class="font-medium">Saldo pendiente:</span>
-                  {{ formatCurrency(suggestion.remainingBalance) }}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div v-if="paymentPlan.suggestions.length === 0" class="py-12 text-center">
-            <svg
-              class="mx-auto h-12 w-12 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <h3 class="mt-2 text-sm font-medium text-gray-900">¡Excelente!</h3>
-            <p class="mt-1 text-sm text-gray-500">No tienes pagos pendientes este mes.</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Proyección de Flujo de Caja -->
-      <div
-        v-if="paymentPlan.cashFlowProjection.length > 0"
-        class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
-      >
-        <h2 class="mb-4 text-xl font-bold text-gray-900">Proyección de Flujo de Caja (30 días)</h2>
-
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Fecha
-                </th>
-                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Tipo
-                </th>
-                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Descripción
-                </th>
-                <th class="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">
-                  Ingresos
-                </th>
-                <th class="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">
-                  Gastos
-                </th>
-                <th class="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">
-                  Saldo
-                </th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200 bg-white">
-              <tr
-                v-for="day in paymentPlan.cashFlowProjection"
-                :key="day.date"
-                :class="[
-                  day.balance < 0 ? 'bg-red-50' : '',
-                  day.type === 'income' ? 'bg-green-50' : '',
-                ]"
-              >
-                <td class="whitespace-nowrap px-4 py-3 text-sm font-medium">
-                  {{ formatDate(day.date) }}
-                </td>
-                <td class="whitespace-nowrap px-4 py-3 text-sm">
-                  <span
-                    v-if="day.type === 'income'"
-                    class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800"
-                  >
-                    💰 Ingreso
-                  </span>
-                  <span
-                    v-else
-                    class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800"
-                  >
-                    📤 Pagos
-                  </span>
-                </td>
-                <td class="px-4 py-3 text-sm">
-                  <div v-if="day.type === 'income'" class="font-medium text-green-700">
-                    Ingreso recurrente esperado
-                  </div>
-                  <div v-else class="space-y-1">
-                    <div
-                      v-for="payment in day.payments"
-                      :key="payment.id"
-                      class="text-xs text-gray-700"
-                    >
-                      {{ payment.name }}
-                    </div>
-                  </div>
-                </td>
-                <td
-                  class="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-green-600"
-                >
-                  <span v-if="day.income > 0">+{{ formatCurrency(day.income) }}</span>
-                  <span v-else class="text-gray-400">-</span>
-                </td>
-                <td
-                  class="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-red-600"
-                >
-                  <span v-if="day.expenses > 0">-{{ formatCurrency(day.expenses) }}</span>
-                  <span v-else class="text-gray-400">-</span>
-                </td>
-                <td
-                  class="whitespace-nowrap px-4 py-3 text-right text-sm font-bold"
-                  :class="day.balance < 0 ? 'text-red-600' : 'text-green-600'"
-                >
-                  {{ formatCurrency(day.balance) }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Consejos Adicionales -->
-      <div class="rounded-lg border border-blue-200 bg-blue-50 p-6">
-        <h3 class="mb-3 flex items-center text-lg font-bold text-blue-900">
-          <svg class="mr-2 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-            />
+        <div class="flex items-center gap-2 border-b border-gray-50 px-4 py-3">
+          <svg class="h-4 w-4 shrink-0 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
-          Consejos para una mejor salud financiera
-        </h3>
-        <ul class="space-y-2 text-sm text-blue-800">
-          <li class="flex items-start">
-            <span class="mr-2">💡</span>
-            <span
-              ><strong>Prioriza pagos urgentes:</strong> Los pagos marcados en rojo deben hacerse
-              inmediatamente para evitar cargos adicionales.</span
-            >
-          </li>
-          <li class="flex items-start">
-            <span class="mr-2">💡</span>
-            <span
-              ><strong>Mantén un colchón:</strong> Siempre trata de mantener al menos el 10% de tus
-              ingresos como reserva de emergencia.</span
-            >
-          </li>
-          <li class="flex items-start">
-            <span class="mr-2">💡</span>
-            <span
-              ><strong>Paga deudas de alto interés:</strong> Prioriza las deudas con tasas de
-              interés superiores al 15% para ahorrar dinero a largo plazo.</span
-            >
-          </li>
-          <li class="flex items-start">
-            <span class="mr-2">💡</span>
-            <span
-              ><strong>Automatiza pagos recurrentes:</strong> Configura pagos automáticos para
-              servicios básicos y evita olvidos.</span
-            >
+          <p class="text-sm font-semibold text-gray-700">Análisis de situación</p>
+        </div>
+        <ul class="divide-y divide-gray-50">
+          <li
+            v-for="(w, i) in paymentPlan.summary.warnings"
+            :key="i"
+            class="px-4 py-2.5 text-sm text-gray-600"
+          >
+            {{ w }}
           </li>
         </ul>
       </div>
-    </div>
+
+      <!-- ── Estrategia de pago (chips resumen) ────────────────────────────── -->
+      <div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+        <p class="mb-3 text-xs font-bold uppercase tracking-wide text-gray-400">Estrategia sugerida</p>
+        <div class="flex flex-wrap gap-3">
+          <div class="flex items-center gap-2 rounded-xl bg-red-50 px-3 py-2 ring-1 ring-red-100">
+            <div class="h-2 w-2 rounded-full bg-red-500"></div>
+            <div>
+              <p class="text-xs font-bold text-red-700">Paso 1 · Urgente</p>
+              <p class="text-xs text-red-600">{{ urgentSuggestions.length }} pago{{ urgentSuggestions.length !== 1 ? 's' : '' }} · Hacer HOY</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 rounded-xl bg-orange-50 px-3 py-2 ring-1 ring-orange-100">
+            <div class="h-2 w-2 rounded-full bg-orange-500"></div>
+            <div>
+              <p class="text-xs font-bold text-orange-700">Paso 2 · Alta</p>
+              <p class="text-xs text-orange-600">{{ highSuggestions.length }} pago{{ highSuggestions.length !== 1 ? 's' : '' }} · Esta semana</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2 ring-1 ring-gray-100">
+            <div class="h-2 w-2 rounded-full bg-gray-400"></div>
+            <div>
+              <p class="text-xs font-bold text-gray-600">Paso 3 · Resto</p>
+              <p class="text-xs text-gray-500">{{ restSuggestions.length }} pago{{ restSuggestions.length !== 1 ? 's' : '' }} · Antes del vencimiento</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Lista de sugerencias de pago ──────────────────────────────────── -->
+      <div>
+        <p class="mb-3 text-sm font-semibold text-gray-700">
+          Plan de pagos
+          <span class="ml-1 text-xs font-normal text-gray-400">(ordenado por prioridad)</span>
+        </p>
+
+        <!-- Empty state -->
+        <div
+          v-if="paymentPlan.suggestions.length === 0"
+          class="flex flex-col items-center justify-center rounded-2xl bg-white py-16 text-center shadow-sm ring-1 ring-gray-100"
+        >
+          <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50">
+            <svg class="h-8 w-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h3 class="mt-4 text-sm font-semibold text-gray-700">¡Todo al día!</h3>
+          <p class="mt-1 text-sm text-gray-400">No tienes pagos pendientes este mes.</p>
+        </div>
+
+        <!-- Suggestions -->
+        <div v-else class="space-y-2.5">
+          <div
+            v-for="(s, idx) in paymentPlan.suggestions"
+            :key="s.id"
+            class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 transition hover:shadow-md"
+          >
+            <!-- Barra de prioridad -->
+            <div class="flex">
+              <div class="w-1 shrink-0" :class="priorityConfig[s.priority].bar"></div>
+              <div class="flex-1 p-4">
+                <!-- Fila 1: número, nombre, badges -->
+                <div class="flex flex-wrap items-start gap-2">
+                  <span class="shrink-0 text-xs font-bold text-gray-300">{{ String(idx + 1).padStart(2, '0') }}</span>
+                  <p class="flex-1 text-sm font-semibold text-gray-800 leading-tight">{{ s.name }}</p>
+                  <div class="flex shrink-0 gap-1.5">
+                    <span
+                      class="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                      :class="priorityConfig[s.priority].badge"
+                    >
+                      {{ priorityConfig[s.priority].label }}
+                    </span>
+                    <span
+                      class="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                      :class="typeBadge[s.type]"
+                    >
+                      {{ typeLabel[s.type] }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Razón -->
+                <p class="mt-1.5 text-xs text-gray-500 italic">{{ s.reason }}</p>
+
+                <!-- Fila de datos -->
+                <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                  <!-- Monto -->
+                  <div class="flex items-baseline gap-1">
+                    <span class="text-xs text-gray-400">Monto</span>
+                    <span class="text-base font-bold text-gray-900">{{ formatCurrency(s.amount) }}</span>
+                  </div>
+
+                  <!-- Vence -->
+                  <div class="flex items-center gap-1 text-xs">
+                    <svg class="h-3.5 w-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span class="text-gray-400">Vence</span>
+                    <span :class="dueDateLabel(s.dueDate).cls">{{ formatDate(s.dueDate) }}</span>
+                    <span
+                      class="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                      :class="dueDateLabel(s.dueDate).cls.includes('red') ? 'bg-red-50' : dueDateLabel(s.dueDate).cls.includes('orange') ? 'bg-orange-50' : 'bg-gray-50'"
+                    >
+                      {{ dueDateLabel(s.dueDate).text }}
+                    </span>
+                  </div>
+
+                  <!-- Pagar el -->
+                  <div class="flex items-center gap-1 text-xs">
+                    <svg class="h-3.5 w-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span class="text-gray-400">Pagar el</span>
+                    <span class="font-semibold text-indigo-600">{{ formatDate(s.suggestedPaymentDate) }}</span>
+                  </div>
+
+                  <!-- Interés -->
+                  <div v-if="s.interestRate" class="flex items-center gap-1 text-xs">
+                    <span class="text-gray-400">Interés</span>
+                    <span class="font-semibold text-rose-600">{{ s.interestRate }}%</span>
+                  </div>
+
+                  <!-- Saldo pendiente -->
+                  <div v-if="s.remainingBalance && s.type === 'debt'" class="flex items-center gap-1 text-xs">
+                    <span class="text-gray-400">Saldo deuda</span>
+                    <span class="font-semibold text-gray-600">{{ formatCurrency(s.remainingBalance) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Proyección de flujo de caja ───────────────────────────────────── -->
+      <div
+        v-if="paymentPlan.cashFlowProjection.length > 0"
+        class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100"
+      >
+        <div class="border-b border-gray-50 px-4 py-3">
+          <p class="text-sm font-semibold text-gray-700">Proyección de flujo (próximos 30 días)</p>
+          <p class="text-xs text-gray-400">Saldo estimado día a día considerando pagos e ingresos esperados</p>
+        </div>
+        <div class="divide-y divide-gray-50">
+          <div
+            v-for="day in paymentPlan.cashFlowProjection"
+            :key="day.date"
+            class="flex items-center gap-4 px-4 py-3"
+            :class="day.balance < 0 ? 'bg-red-50/60' : ''"
+          >
+            <!-- Fecha + tipo -->
+            <div class="shrink-0 text-center w-14">
+              <p class="text-xs font-bold text-gray-700">{{ formatDate(day.date) }}</p>
+            </div>
+
+            <!-- Badge tipo -->
+            <div class="shrink-0">
+              <span
+                class="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                :class="day.type === 'income' ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'"
+              >
+                {{ day.type === 'income' ? 'Ingreso' : 'Pago' }}
+              </span>
+            </div>
+
+            <!-- Descripción -->
+            <div class="min-w-0 flex-1 text-xs text-gray-600">
+              <div v-if="day.type === 'income'" class="font-medium text-emerald-700">
+                Ingreso recurrente esperado
+              </div>
+              <div v-else class="space-y-0.5">
+                <p
+                  v-for="p in day.payments"
+                  :key="p.id"
+                  class="truncate"
+                >
+                  {{ p.name }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Movimiento -->
+            <div class="shrink-0 text-right">
+              <p v-if="day.income > 0" class="text-sm font-semibold text-emerald-600">
+                +{{ formatCurrency(day.income) }}
+              </p>
+              <p v-if="day.expenses > 0" class="text-sm font-semibold text-red-600">
+                -{{ formatCurrency(day.expenses) }}
+              </p>
+            </div>
+
+            <!-- Balance resultante -->
+            <div class="shrink-0 w-24 text-right">
+              <p
+                class="text-sm font-bold"
+                :class="day.balance < 0 ? 'text-red-600' : 'text-gray-800'"
+              >
+                {{ formatCurrency(day.balance) }}
+              </p>
+              <p class="text-[10px] text-gray-400">saldo</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Consejos ───────────────────────────────────────────────────────── -->
+      <div>
+        <p class="mb-3 text-sm font-semibold text-gray-700">Consejos financieros</p>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div
+            v-for="tip in [
+              { icon: '🎯', title: 'Prioriza lo urgente', body: 'Los pagos marcados como urgentes deben realizarse hoy para evitar intereses moratorios y daños a tu historial.' },
+              { icon: '🛡️', title: 'Mantén un colchón', body: 'Intenta mantener al menos el 10% de tus ingresos como reserva de emergencia antes de hacer pagos opcionales.' },
+              { icon: '🔥', title: 'Ataca el alto interés', body: 'Prioriza las deudas con tasa superior al 15%. Pagar el mínimo en las demás y concentrar el excedente aquí ahorra más dinero.' },
+              { icon: '📅', title: 'Paga antes del corte', body: 'En tarjetas de crédito, pagar 2 días antes del vencimiento evita intereses. Nunca esperes al último día.' },
+            ]"
+            :key="tip.title"
+            class="flex gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100"
+          >
+            <span class="text-2xl shrink-0">{{ tip.icon }}</span>
+            <div>
+              <p class="text-sm font-semibold text-gray-800">{{ tip.title }}</p>
+              <p class="mt-0.5 text-xs text-gray-500 leading-relaxed">{{ tip.body }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </template>
   </div>
 </template>

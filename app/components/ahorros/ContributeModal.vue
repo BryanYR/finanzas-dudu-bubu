@@ -42,7 +42,7 @@ const remaining = computed(() => {
 
 const handleSubmit = async () => {
   if (!props.goal || form.amount <= 0) {
-    alert('Por favor ingresa un monto válido')
+    useToast().warning('Por favor ingresa un monto válido')
     return
   }
 
@@ -65,7 +65,7 @@ const handleSubmit = async () => {
     resetForm()
   } catch (err) {
     console.error('Error al guardar:', err)
-    alert('Error al registrar la contribución')
+    useToast().error('Error al registrar la contribución')
   } finally {
     saving.value = false
   }

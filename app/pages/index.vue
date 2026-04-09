@@ -1,211 +1,214 @@
 <script setup lang="ts">
 import type { User, DashboardStats } from '#types/dashboard'
-import MoneyIcon from '@components/icons/dashboard/MoneyIcon.vue'
-import CreditCardIcon from '@components/icons/dashboard/CreditCardIcon.vue'
-import WalletIcon from '@components/icons/dashboard/WalletIcon.vue'
-import GoalIcon from '@components/icons/ahorros/GoalIcon.vue'
-import PlusIcon from '@components/icons/common/PlusIcon.vue'
-import PaymentIcon from '@components/icons/common/PaymentIcon.vue'
-import ChartBarIcon from '@components/icons/planificacion/ChartBarIcon.vue'
-import CheckCircleIcon from '@components/icons/common/CheckCircleIcon.vue'
 
-// Obtener datos del usuario autenticado
 const { data: user } = await useFetchAuth<User>('/api/auth/me')
-
-// Obtener estadísticas del mes actual
-const { data: stats, refresh: refreshStats } =
-  await useFetchAuth<DashboardStats>('/api/dashboard/stats')
+const { data: stats } = await useFetchAuth<DashboardStats>('/api/dashboard/stats')
 
 const { $dayjs } = useNuxtApp()
 const dayjs = $dayjs as typeof import('dayjs')
-const currentHour = dayjs().hour()
+const { formatCurrency } = useDateFormatter()
+
 const greeting = computed(() => {
-  if (currentHour < 12) return '¡Buenos días'
-  if (currentHour < 18) return '¡Buenas tardes'
-  return '¡Buenas noches'
+  const h = dayjs().hour()
+  if (h < 12) return 'Buenos días'
+  if (h < 18) return 'Buenas tardes'
+  return 'Buenas noches'
 })
 
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('es-EC', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)
-}
+const firstName = computed(() => user.value?.name?.split(' ')[0] ?? '')
 
-const balance = computed(() => {
-  return (stats.value?.totalIncome || 0) - (stats.value?.totalExpenses || 0)
+const currentDate = computed(() =>
+  dayjs().format('dddd, D [de] MMMM YYYY'),
+)
+
+const balance = computed(() => (stats.value?.totalIncome ?? 0) - (stats.value?.totalExpenses ?? 0))
+
+const savingsRate = computed(() => {
+  const income = stats.value?.totalIncome ?? 0
+  if (income === 0) return 0
+  return Math.max(0, Math.min(100, Math.round((balance.value / income) * 100)))
 })
 
-const balanceColor = computed(() => {
-  if (balance.value > 0) return 'from-green-400 to-green-600'
-  if (balance.value < 0) return 'from-red-400 to-red-600'
-  return 'from-gray-400 to-gray-600'
-})
+const quickActions = [
+  { to: '/ingresos', label: 'Ingreso', icon: '↑', bg: 'bg-emerald-500', hover: 'hover:bg-emerald-600', light: 'bg-emerald-50' },
+  { to: '/gastos', label: 'Gasto', icon: '↓', bg: 'bg-red-500', hover: 'hover:bg-red-600', light: 'bg-red-50' },
+  { to: '/tarjetas', label: 'Tarjeta', icon: '💳', bg: 'bg-indigo-500', hover: 'hover:bg-indigo-600', light: 'bg-indigo-50' },
+  { to: '/ahorros', label: 'Ahorro', icon: '⭐', bg: 'bg-amber-500', hover: 'hover:bg-amber-600', light: 'bg-amber-50' },
+  { to: '/deudas', label: 'Deuda', icon: '📋', bg: 'bg-purple-500', hover: 'hover:bg-purple-600', light: 'bg-purple-50' },
+  { to: '/reportes', label: 'Reporte', icon: '📊', bg: 'bg-sky-500', hover: 'hover:bg-sky-600', light: 'bg-sky-50' },
+]
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-6">
-    <div class="mx-auto max-w-6xl">
-      <!-- Welcome Header -->
-      <div class="mb-8 rounded-2xl bg-white p-8 shadow-lg">
-        <div class="flex items-center justify-between">
-          <div>
-            <h1 class="mb-2 text-4xl font-bold text-gray-800">
-              {{ greeting }}, {{ user?.name }}! 👋
-            </h1>
-            <p class="text-lg text-gray-600">Bienvenido a tu centro de control financiero</p>
-          </div>
-          <div class="hidden md:block">
-            <div
-              class="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-3xl text-white shadow-lg"
-            >
-              💰
-            </div>
-          </div>
-        </div>
+  <div class="mx-auto max-w-2xl space-y-4 lg:max-w-5xl">
+    <!-- Saludo -->
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="text-sm font-medium text-gray-400 capitalize">{{ currentDate }}</p>
+        <h2 class="text-xl font-bold text-gray-800 lg:text-2xl">
+          {{ greeting }}, {{ firstName }} 👋
+        </h2>
       </div>
-
-      <!-- Quick Stats Cards -->
-      <div class="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <!-- Card 1: Ingresos -->
-        <div
-          class="transform rounded-xl bg-gradient-to-br from-green-400 to-green-600 p-6 text-white shadow-lg transition hover:scale-105"
-        >
-          <div class="mb-2 flex items-center justify-between">
-            <h3 class="text-sm font-medium opacity-90">Ingresos del Mes</h3>
-            <MoneyIcon />
-          </div>
-          <p class="text-3xl font-bold">{{ formatCurrency(stats?.totalIncome || 0) }}</p>
-          <p class="mt-2 text-sm opacity-80">{{ stats?.incomeCount || 0 }} transacciones</p>
-        </div>
-
-        <!-- Card 2: Gastos -->
-        <div
-          class="transform rounded-xl bg-gradient-to-br from-red-400 to-red-600 p-6 text-white shadow-lg transition hover:scale-105"
-        >
-          <div class="mb-2 flex items-center justify-between">
-            <h3 class="text-sm font-medium opacity-90">Gastos del Mes</h3>
-            <CreditCardIcon />
-          </div>
-          <p class="text-3xl font-bold">{{ formatCurrency(stats?.totalExpenses || 0) }}</p>
-          <div class="mt-2 flex gap-2 text-xs opacity-80">
-            <span>💵 {{ formatCurrency(stats?.cashExpenses || 0) }}</span>
-            <span>💳 {{ formatCurrency(stats?.debitExpenses || 0) }}</span>
-            <span>💳 {{ formatCurrency(stats?.creditExpenses || 0) }}</span>
-          </div>
-        </div>
-
-        <!-- Card 3: Balance -->
-        <div
-          :class="[
-            'transform rounded-xl bg-gradient-to-br p-6 text-white shadow-lg transition hover:scale-105',
-            balanceColor,
-          ]"
-        >
-          <div class="mb-2 flex items-center justify-between">
-            <h3 class="text-sm font-medium opacity-90">Balance</h3>
-            <WalletIcon />
-          </div>
-          <p class="text-3xl font-bold">{{ formatCurrency(balance) }}</p>
-          <p class="mt-2 text-sm opacity-80">
-            {{ balance > 0 ? '✅ Superávit' : balance < 0 ? '⚠️ Déficit' : 'Equilibrado' }}
-          </p>
-        </div>
-
-        <!-- Card 4: Ahorros -->
-        <div
-          class="transform rounded-xl bg-gradient-to-br from-yellow-400 to-orange-500 p-6 text-white shadow-lg transition hover:scale-105"
-        >
-          <div class="mb-2 flex items-center justify-between">
-            <h3 class="text-sm font-medium opacity-90">Metas de Ahorro</h3>
-            <GoalIcon />
-          </div>
-          <p class="text-3xl font-bold">{{ stats?.savingsGoals || 0 }} activas</p>
-          <p class="mt-2 text-sm opacity-80">
-            {{ formatCurrency(stats?.totalSavings || 0) }} ahorrado
-          </p>
-        </div>
-      </div>
-
-      <!-- Quick Actions -->
-      <div class="mb-8 rounded-2xl bg-white p-8 shadow-lg">
-        <h2 class="mb-6 text-2xl font-bold text-gray-800">Acciones Rápidas</h2>
-        <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <NuxtLink
-            to="/ingresos"
-            class="flex flex-col items-center rounded-xl bg-green-50 p-6 text-center transition hover:bg-green-100"
-          >
-            <div class="mb-3 rounded-full bg-green-500 p-4 text-white">
-              <PlusIcon custom-class="h-6 w-6" />
-            </div>
-            <span class="font-medium text-gray-800">Nuevo Ingreso</span>
-          </NuxtLink>
-
-          <NuxtLink
-            to="/gastos"
-            class="flex flex-col items-center rounded-xl bg-red-50 p-6 text-center transition hover:bg-red-100"
-          >
-            <div class="mb-3 rounded-full bg-red-500 p-4 text-white">
-              <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M20 12H4"
-                />
-              </svg>
-            </div>
-            <span class="font-medium text-gray-800">Nuevo Gasto</span>
-          </NuxtLink>
-
-          <NuxtLink
-            to="/ahorros"
-            class="flex flex-col items-center rounded-xl bg-yellow-50 p-6 text-center transition hover:bg-yellow-100"
-          >
-            <div class="mb-3 rounded-full bg-yellow-500 p-4 text-white">
-              <PaymentIcon custom-class="h-6 w-6" />
-            </div>
-            <span class="font-medium text-gray-800">Meta de Ahorro</span>
-          </NuxtLink>
-
-          <NuxtLink
-            to="/reportes"
-            class="flex flex-col items-center rounded-xl bg-purple-50 p-6 text-center transition hover:bg-purple-100"
-          >
-            <div class="mb-3 rounded-full bg-purple-500 p-4 text-white">
-              <ChartBarIcon custom-class="h-6 w-6" />
-            </div>
-            <span class="font-medium text-gray-800">Ver Reportes</span>
-          </NuxtLink>
-        </div>
-      </div>
-
-      <!-- Getting Started Tips -->
       <div
-        class="rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 p-8 text-white shadow-lg"
+        class="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-xl shadow-md"
       >
-        <h2 class="mb-4 text-2xl font-bold">💡 Consejos para Comenzar</h2>
-        <ul class="space-y-3">
-          <li class="flex items-start">
-            <CheckCircleIcon custom-class="mr-3 mt-1 h-5 w-5 flex-shrink-0" />
-            <span>Crea categorías personalizadas para organizar mejor tus ingresos y gastos</span>
-          </li>
-          <li class="flex items-start">
-            <CheckCircleIcon custom-class="mr-3 mt-1 h-5 w-5 flex-shrink-0" />
-            <span>Registra tus ingresos y gastos diarios para tener un mejor control</span>
-          </li>
-          <li class="flex items-start">
-            <CheckCircleIcon custom-class="mr-3 mt-1 h-5 w-5 flex-shrink-0" />
-            <span>Establece metas de ahorro y realiza seguimiento a tu progreso</span>
-          </li>
-          <li class="flex items-start">
-            <CheckCircleIcon custom-class="mr-3 mt-1 h-5 w-5 flex-shrink-0" />
-            <span>Revisa los reportes mensuales para identificar oportunidades de ahorro</span>
-          </li>
-        </ul>
+        💰
       </div>
+    </div>
+
+    <!-- Card principal: Balance -->
+    <div
+      class="relative overflow-hidden rounded-3xl p-6 text-white shadow-xl"
+      :class="
+        balance >= 0
+          ? 'bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-700'
+          : 'bg-gradient-to-br from-red-500 via-red-600 to-rose-700'
+      "
+    >
+      <!-- Decoración de fondo -->
+      <div
+        class="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/10"
+      />
+      <div
+        class="absolute -bottom-10 -left-6 h-32 w-32 rounded-full bg-white/10"
+      />
+
+      <div class="relative">
+        <p class="mb-1 text-sm font-medium text-white/70">Balance del mes</p>
+        <p class="mb-4 text-4xl font-bold tracking-tight lg:text-5xl">
+          {{ formatCurrency(balance) }}
+        </p>
+
+        <!-- Barra de tasa de ahorro -->
+        <div v-if="balance >= 0" class="mb-3">
+          <div class="mb-1 flex justify-between text-xs text-white/70">
+            <span>Tasa de ahorro</span>
+            <span>{{ savingsRate }}%</span>
+          </div>
+          <div class="h-1.5 w-full overflow-hidden rounded-full bg-white/20">
+            <div
+              class="h-full rounded-full bg-white transition-all duration-700"
+              :style="{ width: savingsRate + '%' }"
+            />
+          </div>
+        </div>
+
+        <!-- Mini stats -->
+        <div class="flex gap-4">
+          <div>
+            <p class="text-xs text-white/60">Ingresos</p>
+            <p class="font-semibold">{{ formatCurrency(stats?.totalIncome ?? 0) }}</p>
+          </div>
+          <div class="w-px bg-white/20" />
+          <div>
+            <p class="text-xs text-white/60">Gastos</p>
+            <p class="font-semibold">{{ formatCurrency(stats?.totalExpenses ?? 0) }}</p>
+          </div>
+          <div class="w-px bg-white/20" />
+          <div>
+            <p class="text-xs text-white/60">Ahorros</p>
+            <p class="font-semibold">{{ formatCurrency(stats?.totalSavings ?? 0) }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats rápidas: 2x2 (mobile) / 4 en fila (desktop) -->
+    <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <!-- Ingresos -->
+      <div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+        <div class="mb-3 flex items-center justify-between">
+          <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Ingresos</span>
+          <div class="flex h-7 w-7 items-center justify-center rounded-xl bg-emerald-50">
+            <svg class="h-3.5 w-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
+            </svg>
+          </div>
+        </div>
+        <p class="text-lg font-bold text-gray-800 lg:text-xl">{{ formatCurrency(stats?.totalIncome ?? 0) }}</p>
+        <p class="mt-0.5 text-xs text-gray-400">{{ stats?.incomeCount ?? 0 }} transacciones</p>
+      </div>
+
+      <!-- Gastos -->
+      <div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+        <div class="mb-3 flex items-center justify-between">
+          <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Gastos</span>
+          <div class="flex h-7 w-7 items-center justify-center rounded-xl bg-red-50">
+            <svg class="h-3.5 w-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+            </svg>
+          </div>
+        </div>
+        <p class="text-lg font-bold text-gray-800 lg:text-xl">{{ formatCurrency(stats?.totalExpenses ?? 0) }}</p>
+        <p class="mt-0.5 text-xs text-gray-400">{{ stats?.expenseCount ?? 0 }} transacciones</p>
+      </div>
+
+      <!-- Metas de ahorro -->
+      <div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+        <div class="mb-3 flex items-center justify-between">
+          <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Metas</span>
+          <div class="flex h-7 w-7 items-center justify-center rounded-xl bg-amber-50">
+            <svg class="h-3.5 w-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+            </svg>
+          </div>
+        </div>
+        <p class="text-lg font-bold text-gray-800 lg:text-xl">{{ stats?.savingsGoals ?? 0 }} activas</p>
+        <p class="mt-0.5 text-xs text-gray-400">{{ formatCurrency(stats?.totalSavings ?? 0) }} ahorrado</p>
+      </div>
+
+      <!-- Gastos por método -->
+      <div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+        <div class="mb-3 flex items-center justify-between">
+          <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Métodos</span>
+          <div class="flex h-7 w-7 items-center justify-center rounded-xl bg-indigo-50">
+            <svg class="h-3.5 w-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+            </svg>
+          </div>
+        </div>
+        <div class="space-y-1">
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-gray-500">Efectivo</span>
+            <span class="font-medium text-gray-700">{{ formatCurrency(stats?.cashExpenses ?? 0) }}</span>
+          </div>
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-gray-500">Débito</span>
+            <span class="font-medium text-gray-700">{{ formatCurrency(stats?.debitExpenses ?? 0) }}</span>
+          </div>
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-gray-500">Crédito</span>
+            <span class="font-medium text-gray-700">{{ formatCurrency(stats?.creditExpenses ?? 0) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Acciones rápidas -->
+    <div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 lg:p-5">
+      <h3 class="mb-4 text-sm font-semibold text-gray-700">Acciones rápidas</h3>
+      <div class="grid grid-cols-3 gap-3 lg:grid-cols-6">
+        <NuxtLink
+          v-for="action in quickActions"
+          :key="action.to"
+          :to="action.to"
+          class="flex flex-col items-center gap-2 rounded-2xl p-3 text-center transition-all active:scale-95 lg:p-4"
+          :class="action.light + ' hover:opacity-90'"
+        >
+          <div
+            class="flex h-10 w-10 items-center justify-center rounded-xl text-lg text-white shadow-sm"
+            :class="action.bg"
+          >
+            {{ action.icon }}
+          </div>
+          <span class="text-xs font-medium text-gray-600">{{ action.label }}</span>
+        </NuxtLink>
+      </div>
+    </div>
+
+    <!-- Footer info -->
+    <div class="pb-2 text-center text-xs text-gray-300">
+      Datos del mes actual · Actualizado ahora
     </div>
   </div>
 </template>
-
-<style scoped></style>

@@ -1,9 +1,8 @@
 import { prisma } from '@server/utils/db'
-import { getUserFromSession } from '@server/utils/auth'
+import { requireUser } from '@server/utils/auth'
 
 export default defineEventHandler(async (event) => {
-  const user = await getUserFromSession(event)
-  if (!user) throw createError({ statusCode: 401 })
+  const user = await requireUser(event)
 
   const id = Number(event.context.params?.id)
 
@@ -16,13 +15,14 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'Tarjeta no encontrada' })
   }
 
-  // Obtener todos los pagos de esta tarjeta (gastos con descripción "Pago de Tarjeta")
+  // Los pagos de tarjeta se registran con creditCardId: null (son débitos bancarios),
+  // identificados por su descripción que incluye el nombre de la tarjeta.
   const payments = await prisma.expense.findMany({
     where: {
       userId: user.id,
-      creditCardId: id,
+      creditCardId: null,
       description: {
-        startsWith: 'Pago de Tarjeta',
+        startsWith: `Pago Tarjeta ${card.name}`,
       },
     },
     include: {

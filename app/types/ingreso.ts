@@ -14,3 +14,13 @@ export interface Income {
   createdAt: string
   updatedAt: string
 }
+
+export interface IncomeInput {
+  amount: number
+  description: string
+  date: string
+  isRecurring: boolean
+  frequency?: string
+  categoryId: number
+  notes?: string
+}

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+const { formatCurrency } = useDateFormatter()
 import type { CreditCard } from '#types/tarjeta'
 
 const props = defineProps<{
@@ -89,13 +90,6 @@ const handleSubmit = async () => {
   } finally {
     loading.value = false
   }
-}
-
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('es-EC', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount)
 }
 </script>
 

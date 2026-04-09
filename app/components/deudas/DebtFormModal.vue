@@ -1,18 +1,5 @@
 <script setup lang="ts">
-interface Debt {
-  id?: number
-  name: string
-  creditor: string
-  totalAmount: number
-  remainingAmount: number
-  interestRate: number
-  monthlyPayment: number
-  totalInstallments: number
-  paymentDayOfMonth: number
-  startDate: string
-  endDate?: string
-  isPaid: boolean
-}
+import type { Debt } from '#types/deuda'
 
 const props = defineProps<{
   debt?: Debt | null
@@ -139,7 +126,7 @@ const handleSave = async () => {
     setTimeout(() => resetForm(), 300)
   } catch (err) {
     console.error('Error al guardar deuda:', err)
-    alert('Error al guardar la deuda')
+    useToast().error('Error al guardar la deuda')
   } finally {
     saving.value = false
   }
