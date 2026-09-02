@@ -1,11 +1,12 @@
 import { prisma } from '@server/utils/db'
 import { getUserFromSession } from '@server/utils/auth'
+import { validateBody, CreditCardSchema } from '@server/utils/validation'
 
 export default defineEventHandler(async (event) => {
   const user = await getUserFromSession(event)
   if (!user) throw createError({ statusCode: 401 })
 
-  const body = await readBody(event)
+  const body = validateBody(CreditCardSchema, await readBody(event))
 
   return prisma.creditCard.create({
     data: {
@@ -16,7 +17,7 @@ export default defineEventHandler(async (event) => {
       billingDay: body.billingDay,
       paymentDay: body.paymentDay,
       interestRate: body.interestRate,
-      isActive: body.isActive ?? true,
+      isActive: body.isActive,
       userId: user.id,
     },
   })

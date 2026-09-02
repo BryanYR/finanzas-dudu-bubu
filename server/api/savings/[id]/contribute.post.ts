@@ -1,16 +1,23 @@
 import { prisma } from '@server/utils/db'
 import { getUserFromSession } from '@server/utils/auth'
+import { validateBody, SavingsContributionSchema } from '@server/utils/validation'
 
 export default defineEventHandler(async (event) => {
   const user = await getUserFromSession(event)
   if (!user) throw createError({ statusCode: 401 })
 
   const id = Number(event.context.params?.id)
-  const body = await readBody(event)
+  if (!id || isNaN(id)) throw createError({ statusCode: 400, message: 'ID inválido' })
+
+  const body = validateBody(SavingsContributionSchema, await readBody(event))
 
   const savingsGoal = await prisma.savingsGoal.findUnique({ where: { id } })
   if (!savingsGoal || savingsGoal.userId !== user.id) {
     throw createError({ statusCode: 404, message: 'Meta de ahorro no encontrada' })
+  }
+
+  if (savingsGoal.isCompleted) {
+    throw createError({ statusCode: 400, message: 'Esta meta de ahorro ya está completada' })
   }
 
   // Crear contribución
