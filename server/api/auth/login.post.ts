@@ -39,7 +39,6 @@ export default defineEventHandler(async (event) => {
 
   return {
     message: 'Login exitoso',
-    token,
     user: {
       id: user.id,
       name: user.name,

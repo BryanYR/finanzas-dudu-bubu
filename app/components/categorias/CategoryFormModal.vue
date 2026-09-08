@@ -18,6 +18,7 @@ const emit = defineEmits<{
 }>()
 
 const saving = ref(false)
+const $authFetch = useAuthFetch()
 
 const form = reactive({
   name: '',
@@ -86,13 +87,13 @@ const handleSave = async () => {
   try {
     if (props.category?.id) {
       // Update existing category
-      await $fetch(`/api/categories/${props.category.id}`, {
+      await $authFetch(`/api/categories/${props.category.id}`, {
         method: 'PUT',
         body: dataToSend,
       })
     } else {
       // Create new category
-      await $fetch('/api/categories', {
+      await $authFetch('/api/categories', {
         method: 'POST',
         body: dataToSend,
       })
@@ -127,7 +128,7 @@ const handleSave = async () => {
           v-model="form.name"
           type="text"
           required
-          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
           placeholder="Ej: Alimentación"
         />
       </div>
@@ -140,7 +141,7 @@ const handleSave = async () => {
           id="type"
           v-model="form.type"
           required
-          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
         >
           <option value="">Seleccionar...</option>
           <option value="income">Ingreso</option>
@@ -155,12 +156,12 @@ const handleSave = async () => {
           v-model="form.icon"
           type="text"
           maxlength="2"
-          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
           placeholder="Ej: 🍔"
         />
         <p class="mt-1 text-xs text-gray-500">
           Puedes copiar un emoji desde
-          <a href="https://emojipedia.org/" target="_blank" class="text-indigo-600 hover:underline"
+          <a href="https://emojipedia.org/" target="_blank" class="text-primary-600 hover:underline"
             >Emojipedia</a
           >
         </p>
@@ -179,7 +180,7 @@ const handleSave = async () => {
             v-model="form.color"
             type="text"
             pattern="^#[0-9A-Fa-f]{6}$"
-            class="flex-1 rounded-lg border border-gray-300 px-4 py-2 uppercase focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="flex-1 rounded-lg border border-gray-300 px-4 py-2 uppercase focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
             placeholder="#6B7280"
           />
         </div>

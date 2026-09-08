@@ -40,25 +40,26 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  // Calcular totales
-  const totalIncome = incomes.reduce((sum, income) => sum + income.amount, 0)
-  const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0)
+  // Calcular totales (income.amount / expense.amount / goal.currentAmount vienen
+  // de la BD como Prisma.Decimal; Number(...) los normaliza para sumar con aritmética JS)
+  const totalIncome = incomes.reduce((sum, income) => sum + Number(income.amount), 0)
+  const totalExpenses = expenses.reduce((sum, expense) => sum + Number(expense.amount), 0)
 
   // Gastos por método de pago
   const cashExpenses = expenses
     .filter((e) => e.paymentMethod === 'cash')
-    .reduce((sum, e) => sum + e.amount, 0)
+    .reduce((sum, e) => sum + Number(e.amount), 0)
 
   const debitExpenses = expenses
     .filter((e) => e.paymentMethod === 'debit')
-    .reduce((sum, e) => sum + e.amount, 0)
+    .reduce((sum, e) => sum + Number(e.amount), 0)
 
   const creditExpenses = expenses
     .filter((e) => e.paymentMethod === 'credit')
-    .reduce((sum, e) => sum + e.amount, 0)
+    .reduce((sum, e) => sum + Number(e.amount), 0)
 
   // Total ahorrado en metas activas
-  const totalSavings = savingsGoals.reduce((sum, goal) => sum + goal.currentAmount, 0)
+  const totalSavings = savingsGoals.reduce((sum, goal) => sum + Number(goal.currentAmount), 0)
 
   return {
     totalIncome,

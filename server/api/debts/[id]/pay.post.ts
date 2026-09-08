@@ -1,6 +1,7 @@
 import { prisma } from '@server/utils/db'
 import { getUserFromSession } from '@server/utils/auth'
 import { validateBody, DebtPaymentSchema } from '@server/utils/validation'
+import { serializeDecimals } from '@server/utils/serialize'
 
 export default defineEventHandler(async (event) => {
   const user = await getUserFromSession(event)
@@ -68,22 +69,29 @@ export default defineEventHandler(async (event) => {
       }
     }
 
-    // Actualizar monto restante de la deuda
-    const newRemaining = debt.remainingAmount - body.principal
-    const isPaid = newRemaining <= 0
-
     // Marcar cuotas vencidas pendientes
     await tx.debtInstallment.updateMany({
       where: { debtId: id, status: 'pending', dueDate: { lt: now } },
       data: { status: 'overdue' },
     })
 
+    // Decremento atómico del saldo restante (evita condiciones de carrera con
+    // pagos casi simultáneos que leerían el mismo remainingAmount desactualizado)
+    await tx.debt.update({
+      where: { id },
+      data: { remainingAmount: { decrement: body.principal } },
+    })
+
+    const refreshedDebt = await tx.debt.findUniqueOrThrow({ where: { id } })
+    const remainingAmount = Number(refreshedDebt.remainingAmount)
+    const isPaid = remainingAmount <= 0
+
     return tx.debt.update({
       where: { id },
-      data: { remainingAmount: Math.max(0, newRemaining), isPaid },
+      data: { remainingAmount: Math.max(0, remainingAmount), isPaid },
       include: { installments: { orderBy: { installmentNumber: 'asc' } } },
     })
   })
 
-  return updatedDebt
+  return serializeDecimals(updatedDebt)
 })

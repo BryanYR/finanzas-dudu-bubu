@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import CheckCircleIcon from '@components/icons/common/CheckCircleIcon.vue'
+import CardIcon from '@components/icons/tarjetas/CardIcon.vue'
+
 interface Payment {
   id: number
   amount: number
@@ -23,6 +26,7 @@ const emit = defineEmits<{
 }>()
 
 const { formatDate, formatCurrency } = useDateFormatter()
+const $authFetch = useAuthFetch()
 
 const { $dayjs } = useNuxtApp()
 const dayjs = $dayjs as typeof import('dayjs')
@@ -49,7 +53,7 @@ const loadPaymentHistory = async () => {
   error.value = null
 
   try {
-    const data = await $fetch(`/api/credit-cards/${props.cardId}/payment-history`)
+    const data = await $authFetch(`/api/credit-cards/${props.cardId}/payment-history`)
     payments.value = data.payments
   } catch (err: any) {
     console.error('Error al cargar historial de pagos:', err)
@@ -77,7 +81,7 @@ const totalPaid = computed(() => {
   >
     <div v-if="loading" class="flex items-center justify-center py-8">
       <div
-        class="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"
+        class="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent"
       ></div>
     </div>
 
@@ -87,7 +91,7 @@ const totalPaid = computed(() => {
 
     <div v-else>
       <!-- Summary -->
-      <div class="mb-6 rounded-lg bg-gradient-to-r from-green-500 to-emerald-600 p-6 text-white">
+      <div class="mb-6 rounded-xl bg-primary-600 p-6 text-white">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm opacity-90">Total Pagado</p>
@@ -108,20 +112,8 @@ const totalPaid = computed(() => {
           class="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md"
         >
           <div class="flex items-center gap-4">
-            <div class="rounded-full bg-green-100 p-3">
-              <svg
-                class="h-6 w-6 text-green-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
+            <div class="rounded-full bg-green-100 p-1">
+              <CheckCircleIcon custom-class="h-6 w-6 text-green-600" />
             </div>
             <div>
               <p class="font-semibold text-gray-900">{{ formatCurrency(payment.amount) }}</p>
@@ -147,19 +139,7 @@ const totalPaid = computed(() => {
 
       <!-- Empty State -->
       <div v-else class="py-12 text-center">
-        <svg
-          class="mx-auto h-12 w-12 text-gray-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-          />
-        </svg>
+        <CardIcon custom-class="mx-auto h-10 w-10 text-gray-400" />
         <h3 class="mt-2 text-sm font-medium text-gray-900">Sin historial de pagos</h3>
         <p class="mt-1 text-sm text-gray-500">No se han registrado pagos para esta tarjeta aún.</p>
       </div>

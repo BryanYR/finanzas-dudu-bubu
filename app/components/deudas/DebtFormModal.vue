@@ -14,6 +14,8 @@ interface Debt {
   isPaid: boolean
 }
 
+import InfoIcon from '@components/icons/common/InfoIcon.vue'
+
 const props = defineProps<{
   debt?: Debt | null
   show: boolean
@@ -26,6 +28,7 @@ const emit = defineEmits<{
 
 const saving = ref(false)
 const { today, toISOString } = useDateFormatter()
+const $authFetch = useAuthFetch()
 
 const form = reactive({
   name: '',
@@ -124,12 +127,12 @@ const handleSave = async () => {
 
   try {
     if (props.debt?.id) {
-      await $fetch(`/api/debts/${props.debt.id}`, {
+      await $authFetch(`/api/debts/${props.debt.id}`, {
         method: 'PUT',
         body: dataToSend,
       })
     } else {
-      await $fetch('/api/debts', {
+      await $authFetch('/api/debts', {
         method: 'POST',
         body: dataToSend,
       })
@@ -165,7 +168,7 @@ const handleSave = async () => {
             v-model="form.name"
             type="text"
             required
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
             placeholder="Ej: Préstamo Personal, Crédito Auto"
           />
         </div>
@@ -180,7 +183,7 @@ const handleSave = async () => {
             v-model="form.creditor"
             type="text"
             required
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
             placeholder="Ej: Banco Pichincha, Cooperativa"
           />
         </div>
@@ -199,7 +202,7 @@ const handleSave = async () => {
             required
             min="0"
             step="0.01"
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
             placeholder="0.00"
           />
         </div>
@@ -216,7 +219,7 @@ const handleSave = async () => {
             required
             min="0"
             step="0.01"
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
             placeholder="0.00"
           />
         </div>
@@ -235,7 +238,7 @@ const handleSave = async () => {
             required
             min="0"
             step="0.01"
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
             placeholder="12.50"
           />
         </div>
@@ -252,7 +255,7 @@ const handleSave = async () => {
             required
             min="0"
             step="0.01"
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
             placeholder="0.00"
           />
         </div>
@@ -269,7 +272,7 @@ const handleSave = async () => {
             v-model="form.startDate"
             type="date"
             required
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
 
@@ -282,7 +285,7 @@ const handleSave = async () => {
             id="endDate"
             v-model="form.endDate"
             type="date"
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
       </div>
@@ -300,7 +303,7 @@ const handleSave = async () => {
             required
             min="1"
             max="31"
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
             placeholder="15"
           />
           <p class="mt-1 text-xs text-gray-500">Día del mes en que vence cada cuota (1-31)</p>
@@ -318,7 +321,7 @@ const handleSave = async () => {
             required
             min="1"
             step="1"
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
             placeholder="12"
           />
           <p class="mt-1 text-xs text-gray-500">Ej: 12, 24, 36 cuotas del préstamo</p>
@@ -328,17 +331,7 @@ const handleSave = async () => {
       <!-- Info panel -->
       <div class="rounded-lg border border-blue-200 bg-blue-50 p-4">
         <div class="flex items-start">
-          <svg
-            class="mr-3 h-5 w-5 flex-shrink-0 text-blue-600"
-            fill="currentColor"
-            viewBox="0 0 20 20"
-          >
-            <path
-              fill-rule="evenodd"
-              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-              clip-rule="evenodd"
-            />
-          </svg>
+          <InfoIcon custom-class="mr-3 h-5 w-5 flex-shrink-0 text-blue-600" />
           <div class="text-sm text-blue-800">
             <p class="font-medium">Información importante</p>
             <p class="mt-1">

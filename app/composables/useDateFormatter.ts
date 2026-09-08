@@ -38,9 +38,9 @@ export const useDateFormatter = () => {
   }
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-EC', {
+    return new Intl.NumberFormat('es-PE', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'PEN',
     }).format(amount)
   }
 

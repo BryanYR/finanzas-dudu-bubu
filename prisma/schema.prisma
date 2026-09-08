@@ -51,7 +51,7 @@ model Category {
 // ========== INGRESOS ==========
 model Income {
   id          Int      @id @default(autoincrement())
-  amount      Float
+  amount      Decimal  @db.Decimal(12, 2)
   description String
   date        DateTime @default(now())
   isRecurring Boolean  @default(false) // Si es fijo/recurrente
@@ -73,7 +73,7 @@ model Income {
 // ========== GASTOS ==========
 model Expense {
   id            Int      @id @default(autoincrement())
-  amount        Float
+  amount        Decimal  @db.Decimal(12, 2)
   description   String
   date          DateTime @default(now())
   isRecurring   Boolean  @default(false) // Si es fijo/recurrente
@@ -100,16 +100,17 @@ model Expense {
 
 // ========== TARJETAS DE CRÉDITO ==========
 model CreditCard {
-  id           Int     @id @default(autoincrement())
-  name         String // Ej: "Visa Gold", "MasterCard Platinum"
-  bank         String // Banco emisor
-  lastDigits   String // Últimos 4 dígitos
-  creditLimit  Float // Límite de crédito
-  billingDay   Int // Día de corte (1-31)
-  paymentDay   Int // Día de pago (1-31)
-  interestRate Float? // Tasa de interés anual (opcional)
-  isActive     Boolean @default(true)
-  userId       Int
+  id             Int     @id @default(autoincrement())
+  name           String // Ej: "Visa Gold", "MasterCard Platinum"
+  bank           String // Banco emisor
+  lastDigits     String // Últimos 4 dígitos
+  creditLimit    Decimal @db.Decimal(12, 2) // Límite de crédito
+  billingDay     Int // Día de corte (1-31)
+  paymentDay     Int // Día de pago (1-31)
+  interestRate   Float? // Tasa de interés anual (opcional)
+  carriedBalance Decimal @default(0) @db.Decimal(12, 2) // Saldo que no proviene de Expense (cuotas en curso, deuda previa a usar la app); se actualiza a mano con cada estado de cuenta
+  isActive       Boolean @default(true)
+  userId         Int
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   expenses Expense[]
@@ -124,8 +125,8 @@ model CreditCard {
 model SavingsGoal {
   id            Int       @id @default(autoincrement())
   name          String // Ej: "Viaje a Europa", "Fondo emergencia"
-  targetAmount  Float // Meta a alcanzar
-  currentAmount Float     @default(0) // Monto actual ahorrado
+  targetAmount  Decimal   @db.Decimal(12, 2) // Meta a alcanzar
+  currentAmount Decimal   @default(0) @db.Decimal(12, 2) // Monto actual ahorrado
   deadline      DateTime? // Fecha objetivo (opcional)
   priority      Int       @default(1) // 1=alta, 2=media, 3=baja
   description   String?
@@ -144,7 +145,7 @@ model SavingsGoal {
 // ========== CONTRIBUCIONES A AHORROS ==========
 model SavingsContribution {
   id            Int      @id @default(autoincrement())
-  amount        Float
+  amount        Decimal  @db.Decimal(12, 2)
   date          DateTime @default(now())
   notes         String?
   savingsGoalId Int
@@ -161,10 +162,10 @@ model Debt {
   id                Int       @id @default(autoincrement())
   name              String // Ej: "Préstamo Personal", "Crédito Auto"
   creditor          String // A quién se debe
-  totalAmount       Float // Monto total original
-  remainingAmount   Float // Monto pendiente
+  totalAmount       Decimal   @db.Decimal(12, 2) // Monto total original
+  remainingAmount   Decimal   @db.Decimal(12, 2) // Monto pendiente
   interestRate      Float // Tasa de interés anual
-  monthlyPayment    Float // Cuota mensual
+  monthlyPayment    Decimal   @db.Decimal(12, 2) // Cuota mensual
   totalInstallments Int?      @default(12) // Número total de cuotas del préstamo
   paymentDayOfMonth Int       @default(15) // Día del mes en que vence cada cuota (1-31)
   startDate         DateTime
@@ -187,10 +188,10 @@ model DebtInstallment {
   id                Int      @id @default(autoincrement())
   installmentNumber Int // Número de cuota (1, 2, 3...)
   dueDate           DateTime // Fecha de vencimiento de esta cuota
-  amount            Float // Monto de la cuota
-  principal         Float // Capital programado
-  interest          Float // Interés programado
-  insurance         Float    @default(0) // Seguro programado
+  amount            Decimal  @db.Decimal(12, 2) // Monto de la cuota
+  principal         Decimal  @db.Decimal(12, 2) // Capital programado
+  interest          Decimal  @db.Decimal(12, 2) // Interés programado
+  insurance         Decimal  @default(0) @db.Decimal(12, 2) // Seguro programado
   status            String   @default("pending") // "pending" | "paid" | "overdue" | "advanced"
   debtId            Int
   debtPaymentId     Int? // Vinculación con el pago realizado (si ya se pagó)
@@ -209,10 +210,10 @@ model DebtInstallment {
 // ========== PAGOS DE DEUDAS ==========
 model DebtPayment {
   id            Int      @id @default(autoincrement())
-  amount        Float
-  principal     Float // Monto aplicado a capital
-  interest      Float // Monto de interés
-  insurance     Float    @default(0) // Seguro de desgravamen
+  amount        Decimal  @db.Decimal(12, 2)
+  principal     Decimal  @db.Decimal(12, 2) // Monto aplicado a capital
+  interest      Decimal  @db.Decimal(12, 2) // Monto de interés
+  insurance     Decimal  @default(0) @db.Decimal(12, 2) // Seguro de desgravamen
   date          DateTime @default(now())
   paymentNumber Int // Número de cuota
   notes         String?
@@ -230,19 +231,19 @@ model DebtPayment {
 model BudgetProjection {
   id          Int      @id @default(autoincrement())
   name        String // Ej: "Viaje a Cancún", "Compra de laptop"
-  totalBudget Float // Presupuesto total necesario
+  totalBudget Decimal  @db.Decimal(12, 2) // Presupuesto total necesario
   startDate   DateTime
   endDate     DateTime
   description String?
 
   // Proyecciones
-  expectedIncome  Float // Ingresos proyectados en el período
-  fixedExpenses   Float // Gastos fijos proyectados
-  debtPayments    Float // Pagos de deudas proyectados
-  availableAmount Float // Monto disponible después de fijos
-  debitUsage      Float // Sugerencia de uso en débito
-  creditUsage     Float // Sugerencia de uso en crédito
-  savingsImpact   Float // Impacto en ahorros
+  expectedIncome  Decimal @db.Decimal(12, 2) // Ingresos proyectados en el período
+  fixedExpenses   Decimal @db.Decimal(12, 2) // Gastos fijos proyectados
+  debtPayments    Decimal @db.Decimal(12, 2) // Pagos de deudas proyectados
+  availableAmount Decimal @db.Decimal(12, 2) // Monto disponible después de fijos
+  debitUsage      Decimal @db.Decimal(12, 2) // Sugerencia de uso en débito
+  creditUsage     Decimal @db.Decimal(12, 2) // Sugerencia de uso en crédito
+  savingsImpact   Decimal @db.Decimal(12, 2) // Impacto en ahorros
 
   isCompleted Boolean @default(false)
   userId      Int

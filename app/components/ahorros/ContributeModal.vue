@@ -80,12 +80,12 @@ const handleSubmit = async () => {
     size="md"
   >
     <form @submit.prevent="handleSubmit" class="space-y-4">
-      <div class="rounded-lg bg-indigo-50 p-4">
-        <p class="text-sm font-medium text-indigo-800">{{ goal?.name }}</p>
-        <p class="mt-1 text-xs text-indigo-600">
+      <div class="rounded-lg bg-blue-50 p-4">
+        <p class="text-sm font-medium text-blue-800">{{ goal?.name }}</p>
+        <p class="mt-1 text-xs text-blue-600">
           Faltan
           <span class="font-semibold"
-            >${{ remaining.toLocaleString('es-EC', { minimumFractionDigits: 2 }) }}</span
+            >S/ {{ remaining.toLocaleString('es-PE', { minimumFractionDigits: 2 }) }}</span
           >
           para alcanzar tu meta
         </p>
@@ -98,7 +98,7 @@ const handleSubmit = async () => {
           type="number"
           step="0.01"
           required
-          class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+          class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
           placeholder="0.00"
         />
       </div>
@@ -109,7 +109,7 @@ const handleSubmit = async () => {
           v-model="form.date"
           type="date"
           required
-          class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+          class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
         />
       </div>
 
@@ -118,7 +118,7 @@ const handleSubmit = async () => {
         <textarea
           v-model="form.notes"
           rows="3"
-          class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+          class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
           placeholder="Descripción de la contribución"
         ></textarea>
       </div>

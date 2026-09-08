@@ -7,7 +7,8 @@ export default defineNuxtRouteMiddleware(async (to) => {
   // Verificar autenticación en el servidor
   if (process.server) {
     try {
-      await $fetch('/api/auth/me')
+      const requestFetch = useRequestFetch()
+      await requestFetch('/api/auth/me')
     } catch (error) {
       return navigateTo('/login')
     }

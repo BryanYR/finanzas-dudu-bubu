@@ -1,5 +1,13 @@
 <script setup lang="ts">
 import type { Debt } from '#types/deuda'
+import PlusIcon from '@components/icons/common/PlusIcon.vue'
+import EditIcon from '@components/icons/common/EditIcon.vue'
+import DeleteIcon from '@components/icons/common/DeleteIcon.vue'
+import HistoryIcon from '@components/icons/common/HistoryIcon.vue'
+import PaymentIcon from '@components/icons/common/PaymentIcon.vue'
+import DocumentTextIcon from '@components/icons/common/DocumentTextIcon.vue'
+import CheckIcon from '@components/icons/common/CheckIcon.vue'
+import DebtIcon from '@components/icons/deudas/DebtIcon.vue'
 
 definePageMeta({
   layout: 'default',
@@ -124,9 +132,9 @@ const handlePaymentSave = async () => {
 
 // Formatters
 const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('es-EC', {
+  return new Intl.NumberFormat('es-PE', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'PEN',
   }).format(amount)
 }
 
@@ -165,22 +173,15 @@ const getCurrentInstallment = (debt: Debt) => {
 </script>
 
 <template>
-  <div class="space-y-6 p-6">
+  <div class="space-y-6">
     <!-- Header -->
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h1 class="text-3xl font-bold text-gray-900">Deudas</h1>
+        <h1 class="text-2xl font-bold text-gray-900">Deudas</h1>
         <p class="mt-1 text-sm text-gray-600">Gestiona tus préstamos y obligaciones financieras</p>
       </div>
       <UiButton @click="handleCreate" variant="primary">
-        <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 4v16m8-8H4"
-          />
-        </svg>
+        <PlusIcon custom-class="mr-2 h-10 w-10" />
         Nueva Deuda
       </UiButton>
     </div>
@@ -188,58 +189,39 @@ const getCurrentInstallment = (debt: Debt) => {
     <!-- Stats Cards -->
     <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
       <!-- Total Pendiente -->
-      <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+      <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-medium text-gray-600">Total Pendiente</p>
-            <p class="mt-2 text-3xl font-bold text-red-600">
+            <p class="mt-2 text-2xl font-bold text-red-600">
               {{ formatCurrency(totalDebt) }}
             </p>
             <p class="mt-1 text-xs text-gray-500">{{ activeDebtsCount }} deuda(s) activa(s)</p>
           </div>
-          <div class="rounded-full bg-red-100 p-3">
-            <svg class="h-8 w-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
+          <div class="rounded-full bg-red-100 p-1">
+            <DebtIcon custom-class="h-8 w-8 text-red-600" />
           </div>
         </div>
       </div>
 
       <!-- Total Original -->
-      <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+      <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-medium text-gray-600">Total Original</p>
-            <p class="mt-2 text-3xl font-bold text-gray-900">
+            <p class="mt-2 text-2xl font-bold text-gray-900">
               {{ formatCurrency(totalOriginal) }}
             </p>
             <p class="mt-1 text-xs text-gray-500">Monto total prestado</p>
           </div>
-          <div class="rounded-full bg-gray-100 p-3">
-            <svg
-              class="h-8 w-8 text-gray-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
+          <div class="rounded-full bg-gray-100 p-1">
+            <DocumentTextIcon custom-class="h-8 w-8 text-gray-600" />
           </div>
         </div>
       </div>
 
       <!-- Total Pagado -->
-      <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+      <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-medium text-gray-600">Total Pagado</p>
@@ -250,37 +232,25 @@ const getCurrentInstallment = (debt: Debt) => {
               {{ totalOriginal > 0 ? Math.round((totalPaid / totalOriginal) * 100) : 0 }}% del total
             </p>
           </div>
-          <div class="rounded-full bg-green-100 p-3">
-            <svg
-              class="h-8 w-8 text-green-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
+          <div class="rounded-full bg-green-100 p-1">
+            <CheckIcon custom-class="h-8 w-8 text-green-600" />
           </div>
         </div>
       </div>
 
       <!-- Cuotas Mensuales -->
-      <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+      <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-medium text-gray-600">Cuotas Mensuales</p>
-            <p class="mt-2 text-3xl font-bold text-orange-600">
+            <p class="mt-2 text-3xl font-bold text-amber-600">
               {{ formatCurrency(monthlyPaymentsTotal) }}
             </p>
             <p class="mt-1 text-xs text-gray-500">Total a pagar mensual</p>
           </div>
-          <div class="rounded-full bg-orange-100 p-3">
+          <div class="rounded-full bg-amber-100 p-1">
             <svg
-              class="h-8 w-8 text-orange-600"
+              class="h-8 w-8 text-amber-600"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -323,7 +293,7 @@ const getCurrentInstallment = (debt: Debt) => {
     </div>
 
     <!-- Data Table -->
-    <div class="">
+    <div>
       <UiDataTable :data="filteredDebts" :columns="columns" :loading="loading">
         <template #cell-name="{ item }">
           <div>
@@ -352,7 +322,7 @@ const getCurrentInstallment = (debt: Debt) => {
         </template>
 
         <template #cell-monthlyPayment="{ item }">
-          <span class="font-semibold text-orange-600">
+          <span class="font-semibold text-amber-600">
             {{ formatCurrency(item.monthlyPayment) }}
           </span>
         </template>
@@ -379,7 +349,7 @@ const getCurrentInstallment = (debt: Debt) => {
               <span
                 :class="[
                   'rounded-full px-2 py-0.5 text-xs font-semibold',
-                  item.isPaid ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800',
+                  item.isPaid ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800',
                 ]"
               >
                 {{ item.isPaid ? 'Pagada' : 'Activa' }}
@@ -387,7 +357,7 @@ const getCurrentInstallment = (debt: Debt) => {
             </div>
             <div class="h-2 w-full overflow-hidden rounded-full bg-gray-200">
               <div
-                :class="['h-full transition-all', item.isPaid ? 'bg-green-500' : 'bg-blue-500']"
+                :class="['h-full transition-all', item.isPaid ? 'bg-green-500' : 'bg-primary-500']"
                 :style="{ width: `${getProgressPercentage(item)}%` }"
               ></div>
             </div>
@@ -398,17 +368,10 @@ const getCurrentInstallment = (debt: Debt) => {
           <div class="flex gap-2">
             <button
               @click="handleViewInstallments(item)"
-              class="rounded-lg p-2 text-purple-600 transition-colors hover:bg-purple-50"
+              class="rounded-lg p-2 text-amber-600 transition-colors hover:bg-amber-50"
               title="Ver cuotas programadas"
             >
-              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
-                />
-              </svg>
+              <DebtIcon custom-class="h-5 w-5" />
             </button>
             <button
               v-if="!item.isPaid"
@@ -416,89 +379,42 @@ const getCurrentInstallment = (debt: Debt) => {
               class="rounded-lg p-2 text-green-600 transition-colors hover:bg-green-50"
               title="Registrar pago"
             >
-              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
+              <PaymentIcon custom-class="h-5 w-5" />
             </button>
             <button
               @click="handleViewHistory(item)"
-              class="rounded-lg p-2 text-blue-600 transition-colors hover:bg-blue-50"
+              class="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
               title="Ver historial de pagos"
             >
-              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
+              <HistoryIcon custom-class="h-5 w-5" />
             </button>
             <button
               @click="handleEdit(item)"
-              class="text-indigo-600 hover:text-indigo-900"
+              class="rounded-lg p-2 text-primary-600 transition-colors hover:bg-primary-50"
               title="Editar"
             >
-              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                />
-              </svg>
+              <EditIcon custom-class="h-5 w-5" />
             </button>
             <button
               @click="handleDelete(item)"
-              class="text-red-600 hover:text-red-900"
+              class="rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50"
               title="Eliminar"
             >
-              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                />
-              </svg>
+              <DeleteIcon custom-class="h-5 w-5" />
             </button>
           </div>
         </template>
 
         <template #empty>
           <div class="py-12 text-center">
-            <svg
-              class="mx-auto h-12 w-12 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
+            <DocumentTextIcon custom-class="mx-auto h-10 w-10 text-gray-400" />
             <h3 class="mt-2 text-sm font-medium text-gray-900">No hay deudas registradas</h3>
             <p class="mt-1 text-sm text-gray-500">
               Comienza registrando tu primera deuda o préstamo.
             </p>
             <div class="mt-6">
               <UiButton @click="handleCreate" variant="primary">
-                <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
+                <PlusIcon custom-class="mr-2 h-10 w-10" />
                 Nueva Deuda
               </UiButton>
             </div>

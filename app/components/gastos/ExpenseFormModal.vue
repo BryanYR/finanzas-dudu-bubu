@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import DollarIcon from '@components/icons/gastos/DollarIcon.vue'
+import CardIcon from '@components/icons/tarjetas/CardIcon.vue'
+
 interface Category {
   id: number
   name: string
@@ -40,6 +43,7 @@ const emit = defineEmits<{
 
 const saving = ref(false)
 const { toISOString, today } = useDateFormatter()
+const $authFetch = useAuthFetch()
 
 const form = reactive({
   amount: 0,
@@ -134,12 +138,12 @@ const handleSave = async () => {
 
   try {
     if (props.expense?.id) {
-      await $fetch(`/api/expenses/${props.expense.id}`, {
+      await $authFetch(`/api/expenses/${props.expense.id}`, {
         method: 'PUT',
         body: dataToSend,
       })
     } else {
-      await $fetch('/api/expenses', {
+      await $authFetch('/api/expenses', {
         method: 'POST',
         body: dataToSend,
       })
@@ -187,7 +191,7 @@ const activeCreditCards = computed(() => {
             required
             min="0"
             step="0.01"
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
             placeholder="0.00"
           />
         </div>
@@ -202,7 +206,7 @@ const activeCreditCards = computed(() => {
             v-model="form.date"
             type="date"
             required
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
       </div>
@@ -217,7 +221,7 @@ const activeCreditCards = computed(() => {
           v-model="form.description"
           type="text"
           required
-          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
           placeholder="Ej: Compra de supermercado"
         />
       </div>
@@ -231,7 +235,7 @@ const activeCreditCards = computed(() => {
           id="categoryId"
           v-model="form.categoryId"
           required
-          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
         >
           <option value="0">Seleccionar...</option>
           <option v-for="cat in expenseCategories" :key="cat.id" :value="cat.id">
@@ -255,14 +259,7 @@ const activeCreditCards = computed(() => {
             ]"
           >
             <input type="radio" v-model="form.paymentMethod" value="cash" class="sr-only" />
-            <svg class="mb-1 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
-              />
-            </svg>
+            <DollarIcon custom-class="mb-1 h-6 w-6" />
             <span class="text-xs font-medium">Efectivo</span>
           </label>
 
@@ -275,14 +272,7 @@ const activeCreditCards = computed(() => {
             ]"
           >
             <input type="radio" v-model="form.paymentMethod" value="debit" class="sr-only" />
-            <svg class="mb-1 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-              />
-            </svg>
+            <CardIcon custom-class="mb-1 h-6 w-6" />
             <span class="text-xs font-medium">Débito</span>
           </label>
 
@@ -295,14 +285,7 @@ const activeCreditCards = computed(() => {
             ]"
           >
             <input type="radio" v-model="form.paymentMethod" value="credit" class="sr-only" />
-            <svg class="mb-1 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-              />
-            </svg>
+            <CardIcon custom-class="mb-1 h-6 w-6" />
             <span class="text-xs font-medium">Crédito</span>
           </label>
         </div>
@@ -316,7 +299,7 @@ const activeCreditCards = computed(() => {
             id="creditCardId"
             v-model="form.creditCardId"
             required
-            class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             <option value="0">Seleccionar tarjeta...</option>
             <option v-for="card in activeCreditCards" :key="card.id" :value="card.id">
@@ -333,7 +316,7 @@ const activeCreditCards = computed(() => {
             id="isRecurring"
             v-model="form.isRecurring"
             type="checkbox"
-            class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
+            class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-2 focus:ring-primary-500"
           />
           <label for="isRecurring" class="ml-2 block text-sm font-medium text-gray-700">
             Gasto recurrente (fijo)
@@ -349,7 +332,7 @@ const activeCreditCards = computed(() => {
             id="frequency"
             v-model="form.frequency"
             required
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             <option value="">Seleccionar...</option>
             <option value="weekly">Semanal</option>
@@ -370,7 +353,7 @@ const activeCreditCards = computed(() => {
           id="notes"
           v-model="form.notes"
           rows="3"
-          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
           placeholder="Información adicional..."
         ></textarea>
       </div>

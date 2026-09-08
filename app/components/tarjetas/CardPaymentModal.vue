@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CreditCard } from '#types/tarjeta'
+import InfoIcon from '@components/icons/common/InfoIcon.vue'
 
 const props = defineProps<{
   show: boolean
@@ -26,6 +27,7 @@ const form = reactive({
 
 const loading = ref(false)
 const error = ref('')
+const $authFetch = useAuthFetch()
 
 // Cargar categorías
 const { data: categories } = await useFetchAuth<any[]>('/api/categories')
@@ -73,7 +75,7 @@ const handleSubmit = async () => {
   error.value = ''
 
   try {
-    await $fetch(`/api/credit-cards/${props.card.id}/pay`, {
+    await $authFetch(`/api/credit-cards/${props.card.id}/pay`, {
       method: 'POST',
       body: {
         amount: form.amount,
@@ -92,9 +94,9 @@ const handleSubmit = async () => {
 }
 
 const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('es-EC', {
+  return new Intl.NumberFormat('es-PE', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'PEN',
   }).format(amount)
 }
 </script>
@@ -103,10 +105,10 @@ const formatCurrency = (amount: number) => {
   <UiModal v-model="localShow" title="Registrar Pago de Tarjeta" size="md">
     <form @submit.prevent="handleSubmit" class="space-y-4">
       <!-- Info de la tarjeta -->
-      <div v-if="card" class="rounded-lg bg-indigo-50 p-4">
-        <p class="text-sm font-medium text-indigo-900">{{ card.name }} - {{ card.bank }}</p>
-        <p class="text-xs text-indigo-700">•••• •••• •••• {{ card.lastDigits }}</p>
-        <p v-if="suggestedAmount" class="mt-2 text-sm text-indigo-800">
+      <div v-if="card" class="rounded-lg bg-primary-50 p-4">
+        <p class="text-sm font-medium text-primary-900">{{ card.name }} - {{ card.bank }}</p>
+        <p class="text-xs text-primary-700">•••• •••• •••• {{ card.lastDigits }}</p>
+        <p v-if="suggestedAmount" class="mt-2 text-sm text-primary-800">
           Monto sugerido: <span class="font-bold">{{ formatCurrency(suggestedAmount) }}</span>
         </p>
       </div>
@@ -127,7 +129,7 @@ const formatCurrency = (amount: number) => {
             step="0.01"
             min="0"
             required
-            class="block w-full rounded-lg border border-gray-300 py-2 pl-8 pr-3 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            class="block w-full rounded-lg border border-gray-300 py-2 pl-8 pr-3 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
             placeholder="0.00"
           />
         </div>
@@ -141,7 +143,7 @@ const formatCurrency = (amount: number) => {
           v-model="form.date"
           type="date"
           required
-          class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
         />
       </div>
 
@@ -151,7 +153,7 @@ const formatCurrency = (amount: number) => {
         <select
           v-model.number="form.categoryId"
           required
-          class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
         >
           <option :value="null" disabled>Selecciona una categoría</option>
           <option v-for="cat in paymentCategories" :key="cat.id" :value="cat.id">
@@ -164,10 +166,11 @@ const formatCurrency = (amount: number) => {
       </div>
 
       <!-- Info adicional -->
-      <div class="rounded-lg border border-blue-200 bg-blue-50 p-3">
+      <div class="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
+        <InfoIcon custom-class="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-600" />
         <p class="text-xs text-blue-800">
-          💡 <strong>Nota:</strong> Este pago se registrará como un gasto en efectivo/débito que
-          sale de tu cuenta bancaria. Los gastos realizados CON la tarjeta ya están registrados por
+          <strong>Nota:</strong> Este pago se registrará como un gasto en efectivo/débito que sale
+          de tu cuenta bancaria. Los gastos realizados CON la tarjeta ya están registrados por
           separado.
         </p>
       </div>

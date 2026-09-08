@@ -1,5 +1,6 @@
 import { prisma } from '@server/utils/db'
 import { getUserFromSession } from '@server/utils/auth'
+import { serializeDecimals } from '@server/utils/serialize'
 
 export default defineEventHandler(async (event) => {
   const user = await getUserFromSession(event)
@@ -7,7 +8,7 @@ export default defineEventHandler(async (event) => {
 
   const query = getQuery(event)
 
-  return prisma.expense.findMany({
+  const expenses = await prisma.expense.findMany({
     where: {
       userId: user.id,
       date: {
@@ -18,4 +19,5 @@ export default defineEventHandler(async (event) => {
     include: { category: true, creditCard: true },
     orderBy: { date: 'desc' },
   })
+  return serializeDecimals(expenses)
 })

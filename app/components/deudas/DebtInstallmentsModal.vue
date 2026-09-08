@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { DebtInstallment } from '#types/deuda'
+import BoltIcon from '@components/icons/deudas/BoltIcon.vue'
 
 const props = defineProps<{
   show: boolean
@@ -12,6 +13,7 @@ const emit = defineEmits<{
 }>()
 
 const { formatDate, formatCurrency } = useDateFormatter()
+const $authFetch = useAuthFetch()
 
 const installments = ref<(DebtInstallment & { debtPayment?: any })[]>([])
 const loading = ref(false)
@@ -32,7 +34,7 @@ const loadInstallments = async () => {
   error.value = null
 
   try {
-    const data = await $fetch(`/api/debts/${props.debtId}/installments`)
+    const data = await $authFetch(`/api/debts/${props.debtId}/installments`)
     installments.value = data as any
   } catch (e: any) {
     error.value = e.message || 'Error al cargar las cuotas'
@@ -57,7 +59,7 @@ const getStatusBadgeClass = (status: string) => {
     pending: 'bg-gray-100 text-gray-800',
     paid: 'bg-green-100 text-green-800',
     overdue: 'bg-red-100 text-red-800',
-    advanced: 'bg-emerald-100 text-emerald-800',
+    advanced: 'bg-primary-100 text-primary-800',
   }
   return classes[status] || 'bg-gray-100 text-gray-800'
 }
@@ -67,7 +69,7 @@ const getRowClass = (status: string) => {
     pending: 'bg-white',
     paid: 'bg-green-50',
     overdue: 'bg-red-50',
-    advanced: 'bg-emerald-50',
+    advanced: 'bg-primary-50',
   }
   return classes[status] || 'bg-white'
 }
@@ -93,7 +95,9 @@ watch(
     size="xl"
   >
     <div v-if="loading" class="flex items-center justify-center py-12">
-      <div class="h-12 w-12 animate-spin rounded-full border-b-2 border-blue-500"></div>
+      <div
+        class="h-12 w-12 animate-spin rounded-full border-4 border-primary-600 border-t-transparent"
+      ></div>
     </div>
 
     <div v-else-if="error" class="py-8 text-center">
@@ -196,8 +200,12 @@ watch(
               <td class="px-4 py-3 text-sm">
                 <span v-if="installment.debtPayment">
                   {{ formatDate(installment.debtPayment.date) }}
-                  <span v-if="isAdvancedPayment(installment)" class="ml-1 text-green-600">
-                    ⚡ Adelantado
+                  <span
+                    v-if="isAdvancedPayment(installment)"
+                    class="ml-1 inline-flex items-center gap-0.5 text-primary-600"
+                  >
+                    <BoltIcon custom-class="h-3.5 w-3.5" />
+                    Adelantado
                   </span>
                 </span>
                 <span v-else class="text-gray-400">-</span>
@@ -214,8 +222,11 @@ watch(
           <span>Pagada</span>
         </div>
         <div class="flex items-center gap-2">
-          <span class="h-3 w-3 rounded bg-emerald-100"></span>
-          <span>Adelantada ⚡</span>
+          <span class="h-3 w-3 rounded bg-primary-100"></span>
+          <span class="inline-flex items-center gap-1">
+            Adelantada
+            <BoltIcon custom-class="h-3.5 w-3.5" />
+          </span>
         </div>
         <div class="flex items-center gap-2">
           <span class="h-3 w-3 rounded border bg-white"></span>

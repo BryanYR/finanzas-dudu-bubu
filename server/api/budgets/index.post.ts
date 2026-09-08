@@ -1,6 +1,7 @@
 import { prisma } from '@server/utils/db'
 import { getUserFromSession } from '@server/utils/auth'
 import { validateBody, BudgetSchema } from '@server/utils/validation'
+import { serializeDecimals } from '@server/utils/serialize'
 
 export default defineEventHandler(async (event) => {
   const user = await getUserFromSession(event)
@@ -12,10 +13,13 @@ export default defineEventHandler(async (event) => {
   const endDate = new Date(body.endDate)
 
   if (endDate <= startDate) {
-    throw createError({ statusCode: 400, message: 'La fecha de fin debe ser posterior a la fecha de inicio' })
+    throw createError({
+      statusCode: 400,
+      message: 'La fecha de fin debe ser posterior a la fecha de inicio',
+    })
   }
 
-  return prisma.budgetProjection.create({
+  const budget = await prisma.budgetProjection.create({
     data: {
       name: body.name,
       totalBudget: body.totalBudget,
@@ -32,4 +36,5 @@ export default defineEventHandler(async (event) => {
       userId: user.id,
     },
   })
+  return serializeDecimals(budget)
 })

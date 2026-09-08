@@ -1,12 +1,13 @@
 import { prisma } from '@server/utils/db'
 import { getUserFromSession } from '@server/utils/auth'
+import { validateBody, CategoryUpdateSchema } from '@server/utils/validation'
 
 export default defineEventHandler(async (event) => {
   const user = await getUserFromSession(event)
   if (!user) throw createError({ statusCode: 401 })
 
   const id = Number(event.context.params?.id)
-  const body = await readBody(event)
+  const body = validateBody(CategoryUpdateSchema, await readBody(event))
 
   const category = await prisma.category.findUnique({ where: { id } })
   if (!category || category.userId !== user.id) {

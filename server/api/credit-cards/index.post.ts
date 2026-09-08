@@ -1,6 +1,7 @@
 import { prisma } from '@server/utils/db'
 import { getUserFromSession } from '@server/utils/auth'
 import { validateBody, CreditCardSchema } from '@server/utils/validation'
+import { serializeDecimals } from '@server/utils/serialize'
 
 export default defineEventHandler(async (event) => {
   const user = await getUserFromSession(event)
@@ -8,7 +9,7 @@ export default defineEventHandler(async (event) => {
 
   const body = validateBody(CreditCardSchema, await readBody(event))
 
-  return prisma.creditCard.create({
+  const creditCard = await prisma.creditCard.create({
     data: {
       name: body.name,
       bank: body.bank,
@@ -17,8 +18,10 @@ export default defineEventHandler(async (event) => {
       billingDay: body.billingDay,
       paymentDay: body.paymentDay,
       interestRate: body.interestRate,
+      carriedBalance: body.carriedBalance,
       isActive: body.isActive,
       userId: user.id,
     },
   })
+  return serializeDecimals(creditCard)
 })

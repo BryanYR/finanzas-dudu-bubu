@@ -1,5 +1,6 @@
 import { prisma } from '@server/utils/db'
 import { getUserFromSession } from '@server/utils/auth'
+import { serializeDecimals } from '@server/utils/serialize'
 
 export default defineEventHandler(async (event) => {
   const user = await getUserFromSession(event)
@@ -16,13 +17,13 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'Tarjeta no encontrada' })
   }
 
-  // Obtener todos los pagos de esta tarjeta (gastos con descripción "Pago de Tarjeta")
+  // Obtener todos los pagos de esta tarjeta (gastos con descripción "Pago Tarjeta ...", generados por pay.post.ts)
   const payments = await prisma.expense.findMany({
     where: {
       userId: user.id,
       creditCardId: id,
       description: {
-        startsWith: 'Pago de Tarjeta',
+        startsWith: 'Pago Tarjeta',
       },
     },
     include: {
@@ -33,7 +34,7 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  return {
+  return serializeDecimals({
     card: {
       id: card.id,
       name: card.name,
@@ -53,5 +54,5 @@ export default defineEventHandler(async (event) => {
           }
         : null,
     })),
-  }
+  })
 })

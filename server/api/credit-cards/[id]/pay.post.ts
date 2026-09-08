@@ -16,6 +16,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'Tarjeta no encontrada' })
   }
 
+  const category = await prisma.category.findFirst({
+    where: { id: body.categoryId, userId: user.id },
+  })
+  if (!category) throw createError({ statusCode: 404, message: 'Categoría no encontrada' })
+
   // Calcular el período que se está pagando (el último cerrado)
   const now = new Date()
   const currentDay = now.getDate()
@@ -24,9 +29,13 @@ export default defineEventHandler(async (event) => {
   let billingEndDate: Date
 
   if (currentDay <= card.billingDay) {
-    billingStartDate = new Date(now.getFullYear(), now.getMonth() - 1, card.billingDay + 1, 0, 0, 0)
-    billingEndDate = new Date(now.getFullYear(), now.getMonth(), card.billingDay, 23, 59, 59)
+    // Todavía no llegamos al corte de este mes: el período cerrado es el del mes anterior
+    // (del día siguiente al corte de hace 2 meses, hasta el corte del mes pasado)
+    billingStartDate = new Date(now.getFullYear(), now.getMonth() - 2, card.billingDay + 1, 0, 0, 0)
+    billingEndDate = new Date(now.getFullYear(), now.getMonth() - 1, card.billingDay, 23, 59, 59)
   } else {
+    // Ya pasó el corte de este mes: el período cerrado es el que acaba de cerrar
+    // (del día siguiente al corte del mes pasado, hasta el corte de este mes)
     billingStartDate = new Date(now.getFullYear(), now.getMonth() - 1, card.billingDay + 1, 0, 0, 0)
     billingEndDate = new Date(now.getFullYear(), now.getMonth(), card.billingDay, 23, 59, 59)
   }

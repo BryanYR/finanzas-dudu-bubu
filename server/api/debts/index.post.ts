@@ -1,6 +1,7 @@
 import { prisma } from '@server/utils/db'
 import { getUserFromSession } from '@server/utils/auth'
 import { validateBody, DebtSchema } from '@server/utils/validation'
+import { serializeDecimals } from '@server/utils/serialize'
 
 export default defineEventHandler(async (event) => {
   const user = await getUserFromSession(event)
@@ -16,22 +17,29 @@ export default defineEventHandler(async (event) => {
   const paymentDay = body.paymentDayOfMonth!
 
   // Generar cuotas antes de crear la deuda para fallar rápido si hay algún error
-  const installmentsData: { installmentNumber: number; dueDate: Date; amount: number; principal: number; interest: number; insurance: number; status: string }[] = []
+  const installmentsData: {
+    installmentNumber: number
+    dueDate: Date
+    amount: number
+    principal: number
+    interest: number
+    insurance: number
+    status: string
+  }[] = []
   let remainingPrincipal = totalAmount
 
   for (let i = 1; i <= totalInstallments; i++) {
     // Calcular fecha de vencimiento usando UTC para evitar problemas de timezone
-    const dueDate = new Date(Date.UTC(
-      startDate.getFullYear(),
-      startDate.getMonth() + i,
-      paymentDay,
-    ))
+    const dueDate = new Date(
+      Date.UTC(startDate.getFullYear(), startDate.getMonth() + i, paymentDay)
+    )
 
     const interestAmount = remainingPrincipal * interestRate
     const principalAmount = monthlyPayment - interestAmount
 
     const finalPrincipal = i === totalInstallments ? remainingPrincipal : principalAmount
-    const finalAmount = i === totalInstallments ? remainingPrincipal + interestAmount : monthlyPayment
+    const finalAmount =
+      i === totalInstallments ? remainingPrincipal + interestAmount : monthlyPayment
 
     installmentsData.push({
       installmentNumber: i,
@@ -76,5 +84,5 @@ export default defineEventHandler(async (event) => {
     })
   })
 
-  return debt
+  return serializeDecimals(debt)
 })

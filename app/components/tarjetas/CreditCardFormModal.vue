@@ -8,6 +8,7 @@ interface CreditCard {
   billingDay: number
   paymentDay: number
   interestRate?: number
+  carriedBalance?: number
   isActive: boolean
 }
 
@@ -22,6 +23,7 @@ const emit = defineEmits<{
 }>()
 
 const saving = ref(false)
+const $authFetch = useAuthFetch()
 
 const form = reactive({
   name: '',
@@ -31,6 +33,7 @@ const form = reactive({
   billingDay: 1,
   paymentDay: 1,
   interestRate: 0,
+  carriedBalance: 0,
   isActive: true,
 })
 
@@ -42,6 +45,7 @@ const resetForm = () => {
   form.billingDay = 1
   form.paymentDay = 1
   form.interestRate = 0
+  form.carriedBalance = 0
   form.isActive = true
 }
 
@@ -57,6 +61,7 @@ watch(
       form.billingDay = newCard.billingDay
       form.paymentDay = newCard.paymentDay
       form.interestRate = newCard.interestRate || 0
+      form.carriedBalance = newCard.carriedBalance || 0
       form.isActive = newCard.isActive
     } else {
       resetForm()
@@ -79,6 +84,7 @@ watch(
       form.billingDay = props.card.billingDay
       form.paymentDay = props.card.paymentDay
       form.interestRate = props.card.interestRate || 0
+      form.carriedBalance = props.card.carriedBalance || 0
       form.isActive = props.card.isActive
     }
   }
@@ -95,17 +101,18 @@ const handleSave = async () => {
     billingDay: Number(form.billingDay),
     paymentDay: Number(form.paymentDay),
     interestRate: form.interestRate ? Number(form.interestRate) : undefined,
+    carriedBalance: Number(form.carriedBalance) || 0,
     isActive: form.isActive,
   }
 
   try {
     if (props.card?.id) {
-      await $fetch(`/api/credit-cards/${props.card.id}`, {
+      await $authFetch(`/api/credit-cards/${props.card.id}`, {
         method: 'PUT',
         body: dataToSend,
       })
     } else {
-      await $fetch('/api/credit-cards', {
+      await $authFetch('/api/credit-cards', {
         method: 'POST',
         body: dataToSend,
       })
@@ -141,7 +148,7 @@ const handleSave = async () => {
             v-model="form.name"
             type="text"
             required
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
             placeholder="Ej: Visa Gold"
           />
         </div>
@@ -156,7 +163,7 @@ const handleSave = async () => {
             v-model="form.bank"
             type="text"
             required
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
             placeholder="Ej: Banco Pichincha"
           />
         </div>
@@ -175,7 +182,7 @@ const handleSave = async () => {
             required
             maxlength="4"
             pattern="[0-9]{4}"
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
             placeholder="1234"
           />
         </div>
@@ -192,7 +199,7 @@ const handleSave = async () => {
             required
             min="0"
             step="0.01"
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
             placeholder="0.00"
           />
         </div>
@@ -211,7 +218,7 @@ const handleSave = async () => {
             required
             min="1"
             max="31"
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
 
@@ -227,7 +234,7 @@ const handleSave = async () => {
             required
             min="1"
             max="31"
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
 
@@ -243,10 +250,30 @@ const handleSave = async () => {
             min="0"
             max="100"
             step="0.01"
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
             placeholder="0.00"
           />
         </div>
+      </div>
+
+      <!-- Saldo previo / cuotas en curso -->
+      <div>
+        <label for="carriedBalance" class="block text-sm font-medium text-gray-700">
+          Saldo previo / cuotas en curso
+        </label>
+        <input
+          id="carriedBalance"
+          v-model="form.carriedBalance"
+          type="number"
+          min="0"
+          step="0.01"
+          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          placeholder="0.00"
+        />
+        <p class="mt-1 text-xs text-gray-500">
+          Deuda que tu banco reporta como usada pero que no vas a registrar gasto por gasto (cuotas
+          en curso, saldo de antes de usar la app). Actualízalo con cada estado de cuenta nuevo.
+        </p>
       </div>
 
       <!-- Estado activo -->
@@ -255,7 +282,7 @@ const handleSave = async () => {
           id="isActive"
           v-model="form.isActive"
           type="checkbox"
-          class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
+          class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-2 focus:ring-primary-500"
         />
         <label for="isActive" class="ml-2 block text-sm text-gray-700"> Tarjeta activa </label>
       </div>

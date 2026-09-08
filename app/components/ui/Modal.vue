@@ -12,7 +12,7 @@
         <!-- Modal -->
         <div
           :class="[
-            'relative z-50 my-8 flex max-h-[calc(100vh-4rem)] w-full flex-col rounded-lg bg-white shadow-xl transition-all',
+            'relative z-50 my-8 flex max-h-[calc(100vh-4rem)] w-full flex-col rounded-xl bg-white shadow-xl transition-all',
             sizeClasses[size],
           ]"
         >
@@ -29,14 +29,7 @@
                   @click="close"
                   class="rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
                 >
-                  <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
+                  <CloseIcon custom-class="h-5 w-5" />
                 </button>
               </div>
             </slot>
@@ -50,7 +43,7 @@
           <!-- Footer -->
           <div
             v-if="$slots.footer"
-            class="flex-shrink-0 rounded-b-lg border-t border-gray-200 bg-gray-50 px-4 py-3 sm:px-6 sm:py-4"
+            class="flex-shrink-0 rounded-b-xl border-t border-gray-200 bg-gray-50 px-4 py-3 sm:px-6 sm:py-4"
           >
             <slot name="footer" />
           </div>
@@ -61,6 +54,8 @@
 </template>
 
 <script setup lang="ts">
+import CloseIcon from '@components/icons/common/CloseIcon.vue'
+
 interface Props {
   modelValue: boolean
   title?: string

@@ -25,3 +25,10 @@ logs
 
 pnpm-lock.yaml
 /app/generated/prisma
+
+# Local Claude Code config
+.claude
+
+# Personal financial exports (sensitive, local seed-data use only)
+prisma/exported-seed-data.ts
+prisma/clean-and-export.ts

@@ -22,7 +22,7 @@ model DebtInstallment {
   status            String   // "pending" | "paid" | "overdue" | "advanced"
   debtId            Int
   debtPaymentId     Int?     // Vinculación con el pago realizado
-  
+
   debt        Debt
   debtPayment DebtPayment?
 }
@@ -55,6 +55,7 @@ POST /api/debts
 ```
 
 **El sistema automáticamente**:
+
 1. Crea la deuda
 2. Genera 12 cuotas programadas
 3. Calcula para cada cuota:
@@ -79,6 +80,7 @@ POST /api/debts/{id}/pay
 ```
 
 **El sistema**:
+
 1. Registra el pago en `DebtPayment`
 2. Vincula el pago con la(s) cuota(s)
 3. Determina el estado:
@@ -92,47 +94,51 @@ POST /api/debts/{id}/pay
 Ver todas las cuotas de una deuda:
 
 ```typescript
-GET /api/debts/{id}/installments
+GET / api / debts / { id } / installments
 ```
 
 Retorna:
+
 ```typescript
-[
+;[
   {
-    "id": 123,
-    "installmentNumber": 1,
-    "dueDate": "2024-02-02",
-    "amount": 1050,
-    "principal": 900,
-    "interest": 150,
-    "status": "advanced", // ⚡ Pagada adelantada!
-    "debtPayment": {
-      "id": 456,
-      "date": "2024-01-25",
-      "amount": 1050
-    }
+    id: 123,
+    installmentNumber: 1,
+    dueDate: '2024-02-02',
+    amount: 1050,
+    principal: 900,
+    interest: 150,
+    status: 'advanced', // ⚡ Pagada adelantada!
+    debtPayment: {
+      id: 456,
+      date: '2024-01-25',
+      amount: 1050,
+    },
   },
   {
-    "installmentNumber": 2,
-    "dueDate": "2024-03-02",
-    "status": "pending" // Próxima cuota a pagar
-  }
+    installmentNumber: 2,
+    dueDate: '2024-03-02',
+    status: 'pending', // Próxima cuota a pagar
+  },
 ]
 ```
 
 ## 🎯 Integración con Planificación de Pagos
 
 ### Antes (sin cuotas programadas)
+
 - ❌ Calculaba la fecha manualmente
 - ❌ No sabía si ya pagaste
 - ❌ No podía detectar pagos adelantados
 
 ### Ahora (con cuotas programadas)
+
 ```typescript
-GET /api/payment-plan/suggestions
+GET / api / payment - plan / suggestions
 ```
 
 Retorna sugerencias que incluyen:
+
 ```typescript
 {
   "id": "debt-5-installment-125",
@@ -148,6 +154,7 @@ Retorna sugerencias que incluyen:
 ```
 
 ✅ **Sabe exactamente**:
+
 - Cuál es la siguiente cuota a pagar
 - Si ya adelantaste el pago de enero
 - Fecha exacta de vencimiento
@@ -224,6 +231,7 @@ GET /api/payment-plan/suggestions
 ### Componente: DebtInstallmentsModal
 
 Muestra tabla completa de cuotas con:
+
 - ✅ Número de cuota
 - ✅ Fecha de vencimiento
 - ✅ Monto, capital, interés
@@ -232,6 +240,7 @@ Muestra tabla completa de cuotas con:
 - ✅ Indicador ⚡ para pagos adelantados
 
 Uso:
+
 ```vue
 <DebtInstallmentsModal
   :show="showModal"
@@ -250,6 +259,7 @@ npx tsx prisma/generate-installments.ts
 ```
 
 Este script:
+
 1. Busca deudas sin cuotas
 2. Genera cuotas retroactivas
 3. Vincula pagos existentes con sus cuotas
@@ -258,16 +268,19 @@ Este script:
 ## 📈 Ventajas
 
 ### Escalabilidad
+
 - ✅ Soporta cualquier número de cuotas
 - ✅ Cualquier frecuencia de pago
 - ✅ Fácil agregar nuevos campos (seguros, penalidades, etc.)
 
 ### Precisión
+
 - ✅ Fechas exactas de vencimiento
 - ✅ Historial completo de pagos
 - ✅ Detección automática de pagos adelantados
 
 ### Integración
+
 - ✅ Planificación de pagos inteligente
 - ✅ Dashboard con métricas precisas
 - ✅ Reportes detallados
@@ -291,6 +304,7 @@ Este script:
 ### Cálculo de Intereses
 
 El sistema usa **amortización francesa** (cuota fija):
+
 ```typescript
 const monthlyRate = annualRate / 100 / 12
 const interestAmount = remainingBalance * monthlyRate
@@ -300,6 +314,7 @@ const principalAmount = monthlyPayment - interestAmount
 ### Índices de Base de Datos
 
 Para rendimiento óptimo:
+
 ```prisma
 @@unique([debtId, installmentNumber])
 @@index([debtId, status])
@@ -309,6 +324,7 @@ Para rendimiento óptimo:
 ### Actualización de Estados
 
 Los estados se actualizan:
+
 - Al consultar cuotas (`installments.get.ts`)
 - Al pagar una cuota (`pay.post.ts`)
 - En sugerencias de pago (`suggestions.get.ts`)
@@ -316,17 +332,21 @@ Los estados se actualizan:
 ## 🆘 Troubleshooting
 
 **Problema**: Las cuotas no se generaron automáticamente
+
 - **Solución**: Ejecuta `npx tsx prisma/generate-installments.ts`
 
 **Problema**: El estado no se actualiza
+
 - **Solución**: Las APIs automáticamente actualizan estados vencidos al consultarlas
 
 **Problema**: Pagos no se vinculan con cuotas
+
 - **Solución**: Asegúrate de pasar `installmentIds` en el body del pago, o el sistema asignará a la próxima cuota pendiente
 
 ## 📞 Soporte
 
 Para más información, revisa:
+
 - [Schema de Base de Datos](./prisma/schema.prisma)
 - [API de Deudas](./server/api/debts/)
 - [Tipos TypeScript](./app/types/deuda.ts)

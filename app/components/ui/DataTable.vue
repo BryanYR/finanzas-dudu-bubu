@@ -7,7 +7,7 @@
         <select
           id="items-per-page"
           v-model.number="itemsPerPageModel"
-          class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
         >
           <option v-for="option in itemsPerPageOptions" :key="option" :value="option">
             {{ option }}
@@ -21,13 +21,13 @@
           v-model="searchQuery"
           type="text"
           placeholder="Buscar..."
-          class="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          class="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
       </div>
     </div>
 
     <!-- Table -->
-    <div class="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+    <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
       <table class="w-full">
         <thead class="bg-gray-50">
           <tr>
@@ -135,7 +135,7 @@
           :class="[
             'rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
             currentPage === page
-              ? 'border-indigo-500 bg-indigo-500 text-white'
+              ? 'border-primary-500 bg-primary-500 text-white'
               : 'border-gray-300 text-gray-700 hover:bg-gray-50',
           ]"
         >

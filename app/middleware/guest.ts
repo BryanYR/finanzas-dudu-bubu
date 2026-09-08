@@ -3,7 +3,8 @@ export default defineNuxtRouteMiddleware(async (to) => {
   // Este middleware se aplicará en la página de login
   if (process.server) {
     try {
-      await $fetch('/api/auth/me')
+      const requestFetch = useRequestFetch()
+      await requestFetch('/api/auth/me')
       // Si llega aquí, el usuario está autenticado, redirigir a home
       return navigateTo('/')
     } catch {

@@ -1,5 +1,6 @@
 import { prisma } from '@server/utils/db'
 import { getUserFromSession } from '@server/utils/auth'
+import { serializeDecimals } from '@server/utils/serialize'
 
 export default defineEventHandler(async (event) => {
   const user = await getUserFromSession(event)
@@ -52,7 +53,7 @@ export default defineEventHandler(async (event) => {
     })
 
     // Re-fetch con el estado actualizado
-    return prisma.debtInstallment.findMany({
+    const refreshed = await prisma.debtInstallment.findMany({
       where: { debtId: id },
       include: {
         debtPayment: {
@@ -68,7 +69,8 @@ export default defineEventHandler(async (event) => {
         installmentNumber: 'asc',
       },
     })
+    return serializeDecimals(refreshed)
   }
 
-  return installments
+  return serializeDecimals(installments)
 })

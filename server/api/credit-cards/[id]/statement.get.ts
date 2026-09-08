@@ -1,5 +1,6 @@
 import { prisma } from '@server/utils/db'
 import { getUserFromSession } from '@server/utils/auth'
+import { serializeDecimals } from '@server/utils/serialize'
 
 export default defineEventHandler(async (event) => {
   const user = await getUserFromSession(event)
@@ -117,19 +118,25 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  // Calcular total
-  const totalAmount = expenses.reduce((sum, expense) => sum + expense.amount, 0)
+  // Calcular total (expense.amount y card.creditLimit vienen de la BD como
+  // Prisma.Decimal; Number(...) los normaliza para poder operar con aritmética JS)
+  const creditLimit = Number(card.creditLimit)
+  const periodExpensesAmount = expenses.reduce((sum, expense) => sum + Number(expense.amount), 0)
+  // carriedBalance cubre lo que el banco reporta como usado (cuotas en curso, saldo
+  // previo a registrar la tarjeta en la app) y que no existe como Expense individual
+  const carriedBalance = Number(card.carriedBalance)
+  const totalAmount = carriedBalance + periodExpensesAmount
 
   // Calcular uso del límite
-  const creditUsagePercent = (totalAmount / card.creditLimit) * 100
+  const creditUsagePercent = (totalAmount / creditLimit) * 100
 
-  return {
+  return serializeDecimals({
     card: {
       id: card.id,
       name: card.name,
       bank: card.bank,
       lastDigits: card.lastDigits,
-      creditLimit: card.creditLimit,
+      creditLimit,
       billingDay: card.billingDay,
       paymentDay: card.paymentDay,
     },
@@ -140,11 +147,14 @@ export default defineEventHandler(async (event) => {
     },
     statement: {
       totalAmount,
+      periodExpensesAmount,
+      carriedBalance,
       transactionCount: expenses.length,
       creditUsagePercent: Number(creditUsagePercent.toFixed(2)),
-      availableCredit: card.creditLimit - totalAmount,
+      availableCredit: Math.max(0, creditLimit - totalAmount),
+      billingEndDate: billingEndDate.toISOString(),
       paymentDueDate: paymentDueDate.toISOString(),
     },
     expenses,
-  }
+  })
 })

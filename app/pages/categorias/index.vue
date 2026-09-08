@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import type { Category } from '#types/categoria'
 import PlusIcon from '@components/icons/common/PlusIcon.vue'
+import EditIcon from '@components/icons/common/EditIcon.vue'
+import DeleteIcon from '@components/icons/common/DeleteIcon.vue'
+import TagIcon from '@components/icons/categorias/TagIcon.vue'
 
 definePageMeta({
   layout: 'default',
@@ -13,6 +16,7 @@ const {
   error,
   refresh,
 } = await useFetchAuth<Category[]>('/api/categories')
+const $authFetch = useAuthFetch()
 
 // State
 const showFormModal = ref(false)
@@ -63,7 +67,7 @@ const deleteCategory = async () => {
 
   deleting.value = true
   try {
-    await $fetch(`/api/categories/${categoryToDelete.value.id}`, {
+    await $authFetch(`/api/categories/${categoryToDelete.value.id}`, {
       method: 'DELETE',
     })
     showDeleteModal.value = false
@@ -87,55 +91,41 @@ const deleteCategory = async () => {
       </div>
       <UiButton @click="openCreateModal" variant="primary">
         <template #default>
-          <PlusIcon custom-class="mr-2" />
+          <PlusIcon custom-class="mr-2 h-10 w-10" />
           Nueva Categoría
         </template>
       </UiButton>
     </div>
 
     <!-- Filters -->
-    <div class="rounded-lg bg-white p-4 shadow-sm">
-      <div class="flex flex-wrap gap-4">
-        <button
-          @click="filterType = 'all'"
-          :class="[
-            'rounded-lg px-4 py-2 text-sm font-medium transition-colors',
-            filterType === 'all'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
-          ]"
-        >
-          Todas
-        </button>
-        <button
-          @click="filterType = 'income'"
-          :class="[
-            'rounded-lg px-4 py-2 text-sm font-medium transition-colors',
-            filterType === 'income'
-              ? 'bg-green-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
-          ]"
-        >
-          Ingresos
-        </button>
-        <button
-          @click="filterType = 'expense'"
-          :class="[
-            'rounded-lg px-4 py-2 text-sm font-medium transition-colors',
-            filterType === 'expense'
-              ? 'bg-red-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
-          ]"
-        >
-          Gastos
-        </button>
-      </div>
+    <div class="flex flex-wrap gap-2">
+      <UiButton
+        @click="filterType = 'all'"
+        :variant="filterType === 'all' ? 'primary' : 'outline'"
+        size="sm"
+      >
+        Todas
+      </UiButton>
+      <UiButton
+        @click="filterType = 'income'"
+        :variant="filterType === 'income' ? 'success' : 'outline'"
+        size="sm"
+      >
+        Ingresos
+      </UiButton>
+      <UiButton
+        @click="filterType = 'expense'"
+        :variant="filterType === 'expense' ? 'danger' : 'outline'"
+        size="sm"
+      >
+        Gastos
+      </UiButton>
     </div>
 
     <!-- Loading State -->
     <div v-if="pending" class="flex items-center justify-center py-12">
       <div
-        class="h-12 w-12 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"
+        class="h-12 w-12 animate-spin rounded-full border-4 border-primary-600 border-t-transparent"
       ></div>
     </div>
 
@@ -158,13 +148,14 @@ const deleteCategory = async () => {
       </template>
 
       <template #cell-icon="{ value }">
-        <span class="text-2xl">{{ value || '📁' }}</span>
+        <span v-if="value" class="text-2xl">{{ value }}</span>
+        <TagIcon v-else custom-class="h-5 w-5 text-gray-400" />
       </template>
 
       <template #cell-color="{ value }">
         <div class="flex items-center gap-2">
           <div
-            class="h-6 w-6 rounded-full border-2 border-gray-300"
+            class="h-6 w-6 rounded-full border border-gray-300"
             :style="{ backgroundColor: value || '#6B7280' }"
           ></div>
           <span class="text-xs text-gray-600">{{ value || '#6B7280' }}</span>
@@ -173,52 +164,26 @@ const deleteCategory = async () => {
 
       <template #cell-actions="{ item }">
         <div class="flex items-center gap-2">
-          <button
+          <UiButton
             @click="openEditModal(item)"
-            class="rounded-lg p-2 text-indigo-600 transition-colors hover:bg-indigo-50"
+            variant="ghost"
+            size="sm"
+            :icon="EditIcon"
             title="Editar"
-          >
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-              />
-            </svg>
-          </button>
-          <button
+          />
+          <UiButton
             @click="openDeleteModal(item)"
-            class="rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50"
+            variant="danger"
+            size="sm"
+            :icon="DeleteIcon"
             title="Eliminar"
-          >
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-              />
-            </svg>
-          </button>
+          />
         </div>
       </template>
 
       <template #empty>
         <div class="text-center">
-          <svg
-            class="mx-auto h-12 w-12 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
-            />
-          </svg>
+          <TagIcon custom-class="mx-auto h-10 w-10 text-gray-400" />
           <h3 class="mt-2 text-sm font-medium text-gray-900">No hay categorías</h3>
           <p class="mt-1 text-sm text-gray-500">Comienza creando una nueva categoría.</p>
         </div>

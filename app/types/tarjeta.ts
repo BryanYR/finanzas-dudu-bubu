@@ -7,6 +7,7 @@ export interface CreditCard {
   billingDay: number
   paymentDay: number
   interestRate?: number
+  carriedBalance?: number
   isActive: boolean
   userId?: number
   createdAt?: string
@@ -18,8 +19,11 @@ export interface CreditCard {
 
 export interface CardStatement {
   totalAmount: number
+  periodExpensesAmount: number
+  carriedBalance: number
   transactionCount: number
   creditUsagePercent: number
   availableCredit: number
+  billingEndDate: string
   paymentDueDate: string
 }

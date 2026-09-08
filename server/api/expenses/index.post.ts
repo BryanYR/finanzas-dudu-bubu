@@ -1,6 +1,7 @@
 import { prisma } from '@server/utils/db'
 import { getUserFromSession } from '@server/utils/auth'
 import { validateBody, ExpenseSchema } from '@server/utils/validation'
+import { serializeDecimals } from '@server/utils/serialize'
 
 export default defineEventHandler(async (event) => {
   const user = await getUserFromSession(event)
@@ -10,10 +11,25 @@ export default defineEventHandler(async (event) => {
 
   // Si el método de pago no es crédito, no puede tener tarjeta asociada
   if (body.paymentMethod !== 'credit' && body.creditCardId) {
-    throw createError({ statusCode: 400, message: 'Solo los gastos con tarjeta de crédito pueden tener una tarjeta asociada' })
+    throw createError({
+      statusCode: 400,
+      message: 'Solo los gastos con tarjeta de crédito pueden tener una tarjeta asociada',
+    })
   }
 
-  return prisma.expense.create({
+  const category = await prisma.category.findFirst({
+    where: { id: body.categoryId, userId: user.id },
+  })
+  if (!category) throw createError({ statusCode: 404, message: 'Categoría no encontrada' })
+
+  if (body.paymentMethod === 'credit' && body.creditCardId) {
+    const creditCard = await prisma.creditCard.findFirst({
+      where: { id: body.creditCardId, userId: user.id },
+    })
+    if (!creditCard) throw createError({ statusCode: 404, message: 'Tarjeta no encontrada' })
+  }
+
+  const expense = await prisma.expense.create({
     data: {
       amount: body.amount,
       description: body.description,
@@ -27,4 +43,5 @@ export default defineEventHandler(async (event) => {
       userId: user.id,
     },
   })
+  return serializeDecimals(expense)
 })

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import InfoIcon from '@components/icons/common/InfoIcon.vue'
+
 interface Debt {
   id: number
   name: string
@@ -21,6 +23,7 @@ const emit = defineEmits<{
 
 const saving = ref(false)
 const { today, toISOString } = useDateFormatter()
+const $authFetch = useAuthFetch()
 
 const form = reactive({
   amount: 0,
@@ -135,7 +138,7 @@ const handleSave = async () => {
   }
 
   try {
-    await $fetch(`/api/debts/${props.debt.id}/pay`, {
+    await $authFetch(`/api/debts/${props.debt.id}/pay`, {
       method: 'POST',
       body: dataToSend,
     })
@@ -167,9 +170,9 @@ const handleSave = async () => {
           <span class="text-gray-600">Saldo pendiente:</span>
           <span class="font-semibold text-red-600">
             {{
-              new Intl.NumberFormat('es-EC', {
+              new Intl.NumberFormat('es-PE', {
                 style: 'currency',
-                currency: 'USD',
+                currency: 'PEN',
               }).format(debt.remainingAmount)
             }}
           </span>
@@ -192,15 +195,15 @@ const handleSave = async () => {
               required
               min="0"
               step="0.01"
-              class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
               placeholder="0.00"
             />
             <p class="mt-1 text-xs text-gray-500">
               Cuota sugerida:
               {{
-                new Intl.NumberFormat('es-EC', {
+                new Intl.NumberFormat('es-PE', {
                   style: 'currency',
-                  currency: 'USD',
+                  currency: 'PEN',
                 }).format(debt.monthlyPayment)
               }}
             </p>
@@ -217,7 +220,7 @@ const handleSave = async () => {
               type="number"
               min="0"
               step="0.01"
-              class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
               placeholder="0.00"
             />
             <p class="mt-1 text-xs text-gray-500">
@@ -235,7 +238,7 @@ const handleSave = async () => {
               v-model="form.date"
               type="date"
               required
-              class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
 
@@ -250,7 +253,7 @@ const handleSave = async () => {
               type="number"
               required
               min="1"
-              class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
         </div>
@@ -292,9 +295,9 @@ const handleSave = async () => {
                   class="mt-1 w-full rounded border border-blue-200 bg-blue-100 px-3 py-2 text-sm font-semibold text-blue-900"
                 >
                   {{
-                    new Intl.NumberFormat('es-EC', {
+                    new Intl.NumberFormat('es-PE', {
                       style: 'currency',
-                      currency: 'USD',
+                      currency: 'PEN',
                     }).format(form.principal)
                   }}
                 </div>
@@ -307,9 +310,9 @@ const handleSave = async () => {
                     <span class="text-blue-800">Capital:</span>
                     <span class="font-semibold text-green-700">
                       {{
-                        new Intl.NumberFormat('es-EC', {
+                        new Intl.NumberFormat('es-PE', {
                           style: 'currency',
-                          currency: 'USD',
+                          currency: 'PEN',
                         }).format(form.principal)
                       }}
                     </span>
@@ -318,9 +321,9 @@ const handleSave = async () => {
                     <span class="text-blue-800">Interés:</span>
                     <span class="font-semibold text-orange-700">
                       {{
-                        new Intl.NumberFormat('es-EC', {
+                        new Intl.NumberFormat('es-PE', {
                           style: 'currency',
-                          currency: 'USD',
+                          currency: 'PEN',
                         }).format(form.interest)
                       }}
                     </span>
@@ -329,9 +332,9 @@ const handleSave = async () => {
                     <span class="text-blue-800">Seguro:</span>
                     <span class="font-semibold text-purple-700">
                       {{
-                        new Intl.NumberFormat('es-EC', {
+                        new Intl.NumberFormat('es-PE', {
                           style: 'currency',
-                          currency: 'USD',
+                          currency: 'PEN',
                         }).format(form.insurance)
                       }}
                     </span>
@@ -341,9 +344,9 @@ const handleSave = async () => {
                       <span class="font-medium text-blue-900">Total:</span>
                       <span class="text-lg font-bold text-blue-900">
                         {{
-                          new Intl.NumberFormat('es-EC', {
+                          new Intl.NumberFormat('es-PE', {
                             style: 'currency',
-                            currency: 'USD',
+                            currency: 'PEN',
                           }).format(form.amount)
                         }}
                       </span>
@@ -352,9 +355,12 @@ const handleSave = async () => {
                 </div>
               </div>
             </div>
-            <p class="mt-3 text-xs text-blue-700">
-              💡 Puedes editar el interés manualmente según tu estado de cuenta (BCP usa tasa
-              compensatoria)
+            <p class="mt-3 flex items-start gap-1 text-xs text-blue-700">
+              <InfoIcon custom-class="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+              <span>
+                Puedes editar el interés manualmente según tu estado de cuenta (BCP usa tasa
+                compensatoria)
+              </span>
             </p>
           </div>
         </div>
@@ -367,7 +373,7 @@ const handleSave = async () => {
           id="notes"
           v-model="form.notes"
           rows="2"
-          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
           placeholder="Notas adicionales (opcional)"
         ></textarea>
       </div>

@@ -1,5 +1,6 @@
 import { prisma } from '@server/utils/db'
 import { getUserFromSession } from '@server/utils/auth'
+import { serializeDecimals } from '@server/utils/serialize'
 
 export default defineEventHandler(async (event) => {
   const user = await getUserFromSession(event)
@@ -20,6 +21,7 @@ export default defineEventHandler(async (event) => {
     return {
       message: 'No hay ingresos recurrentes configurados',
       generated: [],
+      skipped: [],
     }
   }
 
@@ -62,7 +64,7 @@ export default defineEventHandler(async (event) => {
     // Determinar la fecha del ingreso basado en la frecuencia
     let incomeDate: Date
 
-    if (recurringIncome.frequency === 'MONTHLY') {
+    if (recurringIncome.frequency === 'monthly') {
       // Usar el mismo día del mes que el ingreso recurrente original
       const originalDay = new Date(recurringIncome.date).getDate()
 
@@ -78,7 +80,7 @@ export default defineEventHandler(async (event) => {
         })
         continue
       }
-    } else if (recurringIncome.frequency === 'BIWEEKLY') {
+    } else if (recurringIncome.frequency === 'biweekly') {
       // Para quincenal, generar el 15 y el último día del mes
       const day15 = new Date(currentYear, currentMonth, 15)
       const lastDay = new Date(currentYear, currentMonth + 1, 0)
@@ -124,9 +126,9 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  return {
+  return serializeDecimals({
     message: `Se generaron ${generated.length} ingresos recurrentes`,
     generated,
     skipped,
-  }
+  })
 })

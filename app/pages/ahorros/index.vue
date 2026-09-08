@@ -1,5 +1,13 @@
 <script setup lang="ts">
 import type { SavingsGoal } from '#types/ahorro'
+import PlusIcon from '@components/icons/common/PlusIcon.vue'
+import EditIcon from '@components/icons/common/EditIcon.vue'
+import DeleteIcon from '@components/icons/common/DeleteIcon.vue'
+import CheckCircleIcon from '@components/icons/common/CheckCircleIcon.vue'
+import CalendarIcon from '@components/icons/dashboard/CalendarIcon.vue'
+import TrendingUpIcon from '@components/icons/ingresos/TrendingUpIcon.vue'
+import SavingsIcon from '@components/icons/ahorros/SavingsIcon.vue'
+import GoalIcon from '@components/icons/ahorros/GoalIcon.vue'
 
 definePageMeta({
   layout: 'default',
@@ -93,9 +101,9 @@ const getProgressPercentage = (goal: SavingsGoal) => {
 }
 
 const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('es-EC', {
+  return new Intl.NumberFormat('es-PE', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'PEN',
   }).format(amount)
 }
 
@@ -117,14 +125,7 @@ const getDaysRemaining = (deadline?: string) => {
       </div>
       <UiButton @click="openCreateModal" variant="primary">
         <template #default>
-          <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
+          <PlusIcon custom-class="mr-2 h-10 w-10" />
           Nueva Meta
         </template>
       </UiButton>
@@ -132,22 +133,10 @@ const getDaysRemaining = (deadline?: string) => {
 
     <!-- Stats -->
     <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      <div class="rounded-lg bg-white p-6 shadow-sm">
+      <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div class="flex items-center">
-          <div class="rounded-lg bg-green-100 p-3">
-            <svg
-              class="h-6 w-6 text-green-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
+          <div class="rounded-lg bg-blue-100 p-3">
+            <SavingsIcon custom-class="h-6 w-6 text-blue-600" />
           </div>
           <div class="ml-4">
             <p class="text-sm font-medium text-gray-600">Total Ahorrado</p>
@@ -156,22 +145,10 @@ const getDaysRemaining = (deadline?: string) => {
         </div>
       </div>
 
-      <div class="rounded-lg bg-white p-6 shadow-sm">
+      <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div class="flex items-center">
-          <div class="rounded-lg bg-indigo-100 p-3">
-            <svg
-              class="h-6 w-6 text-indigo-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
-              />
-            </svg>
+          <div class="rounded-lg bg-primary-100 p-3">
+            <GoalIcon custom-class="h-6 w-6 text-primary-600" />
           </div>
           <div class="ml-4">
             <p class="text-sm font-medium text-gray-600">Metas Activas</p>
@@ -180,22 +157,10 @@ const getDaysRemaining = (deadline?: string) => {
         </div>
       </div>
 
-      <div class="rounded-lg bg-white p-6 shadow-sm">
+      <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div class="flex items-center">
           <div class="rounded-lg bg-orange-100 p-3">
-            <svg
-              class="h-6 w-6 text-orange-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-              />
-            </svg>
+            <TrendingUpIcon custom-class="h-6 w-6 text-orange-600" />
           </div>
           <div class="ml-4">
             <p class="text-sm font-medium text-gray-600">Meta Total</p>
@@ -206,48 +171,34 @@ const getDaysRemaining = (deadline?: string) => {
     </div>
 
     <!-- Filters -->
-    <div class="rounded-lg bg-white p-4 shadow-sm">
-      <div class="flex flex-wrap gap-4">
-        <button
-          @click="filterType = 'all'"
-          :class="[
-            'rounded-lg px-4 py-2 text-sm font-medium transition-colors',
-            filterType === 'all'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
-          ]"
-        >
-          Todas
-        </button>
-        <button
-          @click="filterType = 'active'"
-          :class="[
-            'rounded-lg px-4 py-2 text-sm font-medium transition-colors',
-            filterType === 'active'
-              ? 'bg-green-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
-          ]"
-        >
-          Activas
-        </button>
-        <button
-          @click="filterType = 'completed'"
-          :class="[
-            'rounded-lg px-4 py-2 text-sm font-medium transition-colors',
-            filterType === 'completed'
-              ? 'bg-gray-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
-          ]"
-        >
-          Completadas
-        </button>
-      </div>
+    <div class="flex flex-wrap gap-2">
+      <UiButton
+        @click="filterType = 'all'"
+        :variant="filterType === 'all' ? 'primary' : 'outline'"
+        size="sm"
+      >
+        Todas
+      </UiButton>
+      <UiButton
+        @click="filterType = 'active'"
+        :variant="filterType === 'active' ? 'success' : 'outline'"
+        size="sm"
+      >
+        Activas
+      </UiButton>
+      <UiButton
+        @click="filterType = 'completed'"
+        :variant="filterType === 'completed' ? 'secondary' : 'outline'"
+        size="sm"
+      >
+        Completadas
+      </UiButton>
     </div>
 
     <!-- Loading State -->
     <div v-if="pending" class="flex items-center justify-center py-12">
       <div
-        class="h-12 w-12 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"
+        class="h-12 w-12 animate-spin rounded-full border-4 border-primary-600 border-t-transparent"
       ></div>
     </div>
 
@@ -261,14 +212,15 @@ const getDaysRemaining = (deadline?: string) => {
       <div
         v-for="goal in filteredGoals"
         :key="goal.id"
-        class="relative overflow-hidden rounded-xl bg-white shadow-md transition-shadow hover:shadow-lg"
+        class="relative overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md"
       >
         <!-- Progress Badge -->
         <div
           v-if="goal.isCompleted"
-          class="absolute right-4 top-4 rounded-full bg-green-500 px-3 py-1 text-xs font-semibold text-white"
+          class="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full bg-green-500 px-3 py-1 text-xs font-semibold text-white"
         >
-          ✓ Completada
+          <CheckCircleIcon custom-class="h-3.5 w-3.5" />
+          Completada
         </div>
 
         <div class="p-6">
@@ -287,7 +239,7 @@ const getDaysRemaining = (deadline?: string) => {
               <div
                 :class="[
                   'h-full transition-all',
-                  goal.isCompleted ? 'bg-green-500' : 'bg-indigo-500',
+                  goal.isCompleted ? 'bg-green-500' : 'bg-blue-500',
                 ]"
                 :style="{ width: getProgressPercentage(goal) + '%' }"
               ></div>
@@ -311,14 +263,7 @@ const getDaysRemaining = (deadline?: string) => {
                   : 'bg-gray-100 text-gray-800',
               ]"
             >
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                />
-              </svg>
+              <CalendarIcon custom-class="h-4 w-4" />
               <span v-if="!goal.isCompleted && getDaysRemaining(goal.deadline)! >= 0"
                 >{{ getDaysRemaining(goal.deadline) }} días restantes</span
               >
@@ -329,61 +274,37 @@ const getDaysRemaining = (deadline?: string) => {
 
           <!-- Actions -->
           <div class="mt-6 flex gap-2">
-            <button
+            <UiButton
               v-if="!goal.isCompleted"
               @click="openContributeModal(goal)"
-              class="flex-1 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
+              variant="success"
+              size="sm"
+              full-width
             >
               Agregar Aporte
-            </button>
-            <button
+            </UiButton>
+            <UiButton
               @click="openEditModal(goal)"
-              class="rounded-lg border border-gray-300 p-2 text-gray-600 transition-colors hover:bg-gray-50"
+              variant="ghost"
+              size="sm"
+              :icon="EditIcon"
               title="Editar"
-            >
-              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                />
-              </svg>
-            </button>
-            <button
+            />
+            <UiButton
               @click="openDeleteModal(goal)"
-              class="rounded-lg border border-gray-300 p-2 text-red-600 transition-colors hover:bg-red-50"
+              variant="danger"
+              size="sm"
+              :icon="DeleteIcon"
               title="Eliminar"
-            >
-              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                />
-              </svg>
-            </button>
+            />
           </div>
         </div>
       </div>
     </div>
 
     <!-- Empty State -->
-    <div v-else class="rounded-lg bg-white p-12 text-center shadow-sm">
-      <svg
-        class="mx-auto h-12 w-12 text-gray-400"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
-        />
-      </svg>
+    <div v-else class="rounded-xl border border-gray-200 bg-white p-12 text-center shadow-sm">
+      <GoalIcon custom-class="mx-auto h-10 w-10 text-gray-400" />
       <h3 class="mt-2 text-sm font-medium text-gray-900">No hay metas de ahorro</h3>
       <p class="mt-1 text-sm text-gray-500">Comienza estableciendo una nueva meta financiera.</p>
     </div>

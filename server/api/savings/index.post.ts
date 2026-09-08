@@ -1,6 +1,7 @@
 import { prisma } from '@server/utils/db'
 import { getUserFromSession } from '@server/utils/auth'
 import { validateBody, SavingsGoalSchema } from '@server/utils/validation'
+import { serializeDecimals } from '@server/utils/serialize'
 
 export default defineEventHandler(async (event) => {
   const user = await getUserFromSession(event)
@@ -8,7 +9,7 @@ export default defineEventHandler(async (event) => {
 
   const body = validateBody(SavingsGoalSchema, await readBody(event))
 
-  return prisma.savingsGoal.create({
+  const savingsGoal = await prisma.savingsGoal.create({
     data: {
       name: body.name,
       targetAmount: body.targetAmount,
@@ -19,4 +20,5 @@ export default defineEventHandler(async (event) => {
       userId: user.id,
     },
   })
+  return serializeDecimals(savingsGoal)
 })

@@ -5,15 +5,18 @@
 Tu proyecto ahora tiene los siguientes alias configurados para facilitar las importaciones:
 
 ### `@server/*`
+
 Acceso directo a la carpeta `server/`
 
 **Antes:**
+
 ```typescript
 import { prisma } from '../../utils/db'
 import { getUserFromSession } from '../../utils/auth'
 ```
 
 **Ahora:**
+
 ```typescript
 import { prisma } from '@server/utils/db'
 import { getUserFromSession } from '@server/utils/auth'
@@ -22,9 +25,11 @@ import { getUserFromSession } from '@server/utils/auth'
 ---
 
 ### `@api/*`
+
 Acceso directo a la carpeta `server/api/`
 
 **Uso:**
+
 ```typescript
 // Desde cualquier parte del proyecto
 import someHandler from '@api/auth/login.post'
@@ -33,9 +38,11 @@ import someHandler from '@api/auth/login.post'
 ---
 
 ### `@prisma/*`
+
 Acceso directo a la carpeta `prisma/`
 
 **Uso:**
+
 ```typescript
 // Para acceder a archivos en la carpeta prisma
 import schema from '@prisma/schema.prisma'
@@ -48,6 +55,7 @@ import schema from '@prisma/schema.prisma'
 Los alias están configurados en dos archivos:
 
 ### `nuxt.config.ts`
+
 ```typescript
 export default defineNuxtConfig({
   alias: {
@@ -59,6 +67,7 @@ export default defineNuxtConfig({
 ```
 
 ### `tsconfig.json`
+
 ```json
 {
   "compilerOptions": {
@@ -101,6 +110,7 @@ import { getUserFromSession } from '../../utils/auth'
 ## 📝 Nota
 
 Si VSCode muestra errores temporales de "Cannot find module", simplemente:
+
 1. Reinicia el servidor de desarrollo: `npm run dev`
 2. O recarga la ventana de VSCode: `Ctrl+Shift+P` → "Reload Window"
 

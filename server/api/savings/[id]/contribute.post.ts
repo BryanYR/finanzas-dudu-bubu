@@ -1,6 +1,7 @@
 import { prisma } from '@server/utils/db'
 import { getUserFromSession } from '@server/utils/auth'
 import { validateBody, SavingsContributionSchema } from '@server/utils/validation'
+import { serializeDecimals } from '@server/utils/serialize'
 
 export default defineEventHandler(async (event) => {
   const user = await getUserFromSession(event)
@@ -20,24 +21,31 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Esta meta de ahorro ya está completada' })
   }
 
-  // Crear contribución
-  await prisma.savingsContribution.create({
-    data: {
-      amount: body.amount,
-      notes: body.notes,
-      savingsGoalId: id,
-    },
+  const updatedGoal = await prisma.$transaction(async (tx) => {
+    // Crear contribución
+    await tx.savingsContribution.create({
+      data: {
+        amount: body.amount,
+        notes: body.notes,
+        savingsGoalId: id,
+      },
+    })
+
+    // Incremento atómico del monto actual (evita condiciones de carrera con
+    // contribuciones casi simultáneas que leerían el mismo currentAmount desactualizado)
+    await tx.savingsGoal.update({
+      where: { id },
+      data: { currentAmount: { increment: body.amount } },
+    })
+
+    const refreshedGoal = await tx.savingsGoal.findUniqueOrThrow({ where: { id } })
+    const isCompleted = Number(refreshedGoal.currentAmount) >= Number(refreshedGoal.targetAmount)
+
+    return tx.savingsGoal.update({
+      where: { id },
+      data: { isCompleted },
+    })
   })
 
-  // Actualizar monto actual
-  const newAmount = savingsGoal.currentAmount + body.amount
-  const isCompleted = newAmount >= savingsGoal.targetAmount
-
-  return prisma.savingsGoal.update({
-    where: { id },
-    data: {
-      currentAmount: newAmount,
-      isCompleted,
-    },
-  })
+  return serializeDecimals(updatedGoal)
 })

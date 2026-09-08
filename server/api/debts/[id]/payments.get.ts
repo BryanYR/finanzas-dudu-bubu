@@ -1,5 +1,6 @@
 import { prisma } from '@server/utils/db'
 import { getUserFromSession } from '@server/utils/auth'
+import { serializeDecimals } from '@server/utils/serialize'
 
 export default defineEventHandler(async (event) => {
   const user = await getUserFromSession(event)
@@ -13,10 +14,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'Deuda no encontrada' })
   }
 
-  return prisma.debtPayment.findMany({
+  const payments = await prisma.debtPayment.findMany({
     where: {
       debtId: id,
     },
     orderBy: [{ paymentNumber: 'asc' }, { date: 'asc' }],
   })
+  return serializeDecimals(payments)
 })

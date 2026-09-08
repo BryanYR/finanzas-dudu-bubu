@@ -21,21 +21,25 @@
 El sistema divide cada pago en dos partes:
 
 **Intereses del período:**
+
 ```
 Interés mensual = (Saldo pendiente × Tasa anual %) / 12
 ```
 
 **Capital (Principal):**
+
 ```
 Capital = Monto del pago - Intereses
 ```
 
 **Ejemplo:**
+
 - Saldo pendiente: $5,000
 - Tasa de interés: 12% anual (1% mensual)
 - Pago: $300
 
 Cálculo:
+
 - Interés = $5,000 × 0.01 = $50
 - Capital = $300 - $50 = $250
 - **Nuevo saldo = $5,000 - $250 = $4,750**
@@ -45,6 +49,7 @@ Cálculo:
 ## Cómo Adelantar Cuotas
 
 ### Ventajas de Adelantar Pagos:
+
 ✅ Reduces el saldo más rápido  
 ✅ Pagas menos intereses totales  
 ✅ Terminas la deuda antes de tiempo  
@@ -58,8 +63,9 @@ Cálculo:
 2. El sistema calcula:
    - Los intereses del período (igual)
    - El resto va **todo al capital**
-   
+
 **Ejemplo:**
+
 - Cuota normal: $300
 - Tú pagas: $500 (adelanto de $200)
 - Intereses: $50 (fijo según saldo)
@@ -99,18 +105,21 @@ Para liquidar completamente:
 2. El modal muestra:
 
 **Panel Superior:**
+
 - Total original de la deuda
 - Saldo pendiente actual
 - Total pagado hasta ahora
 - Número de cuotas pagadas
 
 **Tarjetas de Resumen:**
+
 - 💚 **Capital Pagado**: Cuánto has reducido del préstamo
 - 🧡 **Intereses Pagados**: Cuánto has pagado en intereses
 - 💙 **Total Pagado**: Suma de capital + intereses
 
 **Lista de Pagos:**
 Cada pago registrado muestra:
+
 - Número de cuota
 - Fecha del pago
 - División: Capital / Interés / Total
@@ -121,6 +130,7 @@ Cada pago registrado muestra:
 ## Casos de Uso Comunes
 
 ### 📌 Caso 1: Pago Mensual Regular
+
 ```
 Mes 1: Pago $300 → Capital $250, Interés $50
 Mes 2: Pago $300 → Capital $252.50, Interés $47.50
@@ -129,6 +139,7 @@ Mes 3: Pago $300 → Capital $255.02, Interés $44.98
 ```
 
 ### 📌 Caso 2: Pago Doble (Adelanto)
+
 ```
 Mes 1: Pago $600 → Capital $550, Interés $50
 (Adelantaste casi 2 cuotas completas)
@@ -136,6 +147,7 @@ Mes 2: Los intereses serán menores porque el saldo bajó más
 ```
 
 ### 📌 Caso 3: Pago Extra a Mitad de Mes
+
 ```
 Cuota #1 (día 5): Pago $300 → Capital $250
 Cuota #2 (día 15): Pago $200 → Capital $198, Interés $2
@@ -143,6 +155,7 @@ Cuota #2 (día 15): Pago $200 → Capital $198, Interés $2
 ```
 
 ### 📌 Caso 4: Liquidación Anticipada
+
 ```
 Saldo: $2,000
 Pagas: $2,020
@@ -156,11 +169,13 @@ Resultado: Deuda PAGADA ✅
 ## Validaciones del Sistema
 
 ### ✅ El sistema NO permite:
+
 - Pagos de $0 o negativos
 - Pagos menores a los intereses generados (quedaría deuda infinita)
 - Eliminar una deuda sin confirmación
 
 ### ✅ El sistema SÍ permite:
+
 - Pagar cualquier monto mayor a los intereses
 - Múltiples pagos en el mismo mes
 - Cambiar la fecha de un pago (para registros históricos)
@@ -182,6 +197,7 @@ Resultado: Deuda PAGADA ✅
 ## Próximas Funcionalidades
 
 En desarrollo:
+
 - 📊 Gráfico de progreso de cada deuda
 - 📅 Recordatorios de pago próximos
 - 🔔 Notificaciones cuando se acerca la fecha de pago

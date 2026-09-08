@@ -1,6 +1,7 @@
 import { prisma } from '@server/utils/db'
 import { getUserFromSession } from '@server/utils/auth'
 import { validateBody, IncomeSchema } from '@server/utils/validation'
+import { serializeDecimals } from '@server/utils/serialize'
 
 export default defineEventHandler(async (event) => {
   const user = await getUserFromSession(event)
@@ -8,7 +9,12 @@ export default defineEventHandler(async (event) => {
 
   const body = validateBody(IncomeSchema, await readBody(event))
 
-  return prisma.income.create({
+  const category = await prisma.category.findFirst({
+    where: { id: body.categoryId, userId: user.id },
+  })
+  if (!category) throw createError({ statusCode: 404, message: 'Categoría no encontrada' })
+
+  const income = await prisma.income.create({
     data: {
       amount: body.amount,
       description: body.description,
@@ -20,4 +26,5 @@ export default defineEventHandler(async (event) => {
       userId: user.id,
     },
   })
+  return serializeDecimals(income)
 })

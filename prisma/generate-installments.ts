@@ -32,9 +32,11 @@ async function generateInstallmentsForExistingDebts() {
 
     const startDate = new Date(debt.startDate)
     const totalInstallments = debt.totalInstallments || 12
-    const monthlyPayment = debt.monthlyPayment
+    // debt.monthlyPayment / debt.totalAmount vienen de la BD como Prisma.Decimal;
+    // Number(...) los normaliza para poder operar con aritmética JS normal.
+    const monthlyPayment = Number(debt.monthlyPayment)
     const interestRate = debt.interestRate / 100 / 12 // Tasa mensual
-    const totalAmount = debt.totalAmount
+    const totalAmount = Number(debt.totalAmount)
     const paymentDay = debt.paymentDayOfMonth
 
     const installments = []

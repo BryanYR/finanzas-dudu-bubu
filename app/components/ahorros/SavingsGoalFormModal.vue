@@ -100,7 +100,7 @@ const handleSubmit = async () => {
           v-model="form.name"
           type="text"
           required
-          class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+          class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
           placeholder="Ej: Viaje a Europa"
         />
       </div>
@@ -113,7 +113,7 @@ const handleSubmit = async () => {
             type="number"
             step="0.01"
             required
-            class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+            class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
             placeholder="0.00"
           />
         </div>
@@ -124,7 +124,7 @@ const handleSubmit = async () => {
             v-model="form.currentAmount"
             type="number"
             step="0.01"
-            class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+            class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
             placeholder="0.00"
           />
         </div>
@@ -135,7 +135,7 @@ const handleSubmit = async () => {
         <input
           v-model="form.deadline"
           type="date"
-          class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+          class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500"
         />
       </div>
     </form>

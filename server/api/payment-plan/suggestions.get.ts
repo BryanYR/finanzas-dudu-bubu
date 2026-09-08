@@ -1,5 +1,6 @@
 import { prisma } from '@server/utils/db'
 import { requireUser } from '@server/utils/auth'
+import { getCurrentBalance } from '@server/utils/cash-flow'
 
 export default defineEventHandler(async (event) => {
   const user = await requireUser(event)
@@ -29,26 +30,13 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  // Obtener gastos que ya se hicieron este mes (solo efectivo/débito, NO tarjetas)
-  const expensesThisMonth = await prisma.expense.findMany({
-    where: {
-      userId: user.id,
-      date: {
-        gte: startOfMonth,
-        lte: now,
-      },
-      // Excluir gastos con tarjeta de crédito (esos se pagan después)
-      creditCardId: null,
-    },
-  })
-
-  // Calcular saldo actual real (ingresos recibidos - solo gastos en efectivo/débito)
-  const totalReceivedIncome = receivedIncomesThisMonth.reduce((sum, inc) => sum + inc.amount, 0)
-  const totalSpentCashDebit = expensesThisMonth.reduce((sum, exp) => sum + exp.amount, 0)
-  const currentBalance = totalReceivedIncome - totalSpentCashDebit
+  // Calcular saldo actual real (ingresos recibidos - solo gastos en efectivo/débito).
+  // Extraído a server/utils/cash-flow.ts para reutilizarlo también en
+  // budgets/calculate.post.ts.
+  const currentBalance = await getCurrentBalance(user.id)
 
   // Calcular ingresos proyectados para el resto del mes (ingresos recurrentes pendientes)
-  const totalRecurringIncome = recurringIncomes.reduce((sum, inc) => sum + inc.amount, 0)
+  const totalRecurringIncome = recurringIncomes.reduce((sum, inc) => sum + Number(inc.amount), 0)
 
   // Verificar si ya se recibieron los ingresos recurrentes este mes
   const receivedRecurringThisMonth = receivedIncomesThisMonth.filter((inc) => inc.isRecurring)
@@ -181,7 +169,7 @@ export default defineEventHandler(async (event) => {
         },
       })
 
-      const totalAmount = expenses.reduce((sum, expense) => sum + expense.amount, 0)
+      const totalAmount = expenses.reduce((sum, expense) => sum + Number(expense.amount), 0)
 
       return {
         card,
@@ -245,12 +233,12 @@ export default defineEventHandler(async (event) => {
       id: `debt-${debt.id}-installment-${nextInstallment.id}`,
       type: 'debt',
       name: `${debt.name} - Cuota ${nextInstallment.installmentNumber}/${debt.totalInstallments}`,
-      amount: nextInstallment.amount,
+      amount: Number(nextInstallment.amount),
       dueDate: dueDate.toISOString(),
       priority,
       reason,
       interestRate: debt.interestRate,
-      remainingBalance: debt.remainingAmount,
+      remainingBalance: Number(debt.remainingAmount),
       suggestedPaymentDate: finalSuggestedDate.toISOString(),
       installmentNumber: nextInstallment.installmentNumber,
       installmentId: nextInstallment.id,
@@ -328,7 +316,7 @@ export default defineEventHandler(async (event) => {
       id: `expense-${expense.id}`,
       type: 'expense',
       name: expense.description,
-      amount: expense.amount,
+      amount: Number(expense.amount),
       dueDate: nextPaymentDate.toISOString(),
       priority,
       reason:
@@ -353,6 +341,10 @@ export default defineEventHandler(async (event) => {
   })
 
   // Calcular totales
+  const totalReceivedIncome = receivedIncomesThisMonth.reduce(
+    (sum, inc) => sum + Number(inc.amount),
+    0
+  )
   const totalIncome = totalReceivedIncome + pendingRecurringIncome
   const totalObligations = suggestions.reduce((sum, s) => sum + s.amount, 0)
   const suggestedSafetyBuffer = totalIncome * 0.1 // 10% de los ingresos como colchón

@@ -29,6 +29,7 @@ const emit = defineEmits<{
 
 const saving = ref(false)
 const { today, toISOString } = useDateFormatter()
+const $authFetch = useAuthFetch()
 
 const form = reactive({
   amount: 0,
@@ -102,12 +103,12 @@ const handleSave = async () => {
 
   try {
     if (props.income?.id) {
-      await $fetch(`/api/incomes/${props.income.id}`, {
+      await $authFetch(`/api/incomes/${props.income.id}`, {
         method: 'PUT',
         body: dataToSend,
       })
     } else {
-      await $fetch('/api/incomes', {
+      await $authFetch('/api/incomes', {
         method: 'POST',
         body: dataToSend,
       })
@@ -150,7 +151,7 @@ const incomeCategories = computed(() => {
             required
             min="0"
             step="0.01"
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
             placeholder="0.00"
           />
         </div>
@@ -165,7 +166,7 @@ const incomeCategories = computed(() => {
             v-model="form.date"
             type="date"
             required
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
       </div>
@@ -180,7 +181,7 @@ const incomeCategories = computed(() => {
           v-model="form.description"
           type="text"
           required
-          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
           placeholder="Ej: Sueldo de Diciembre"
         />
       </div>
@@ -194,7 +195,7 @@ const incomeCategories = computed(() => {
           id="categoryId"
           v-model="form.categoryId"
           required
-          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
         >
           <option value="0">Seleccionar...</option>
           <option v-for="cat in incomeCategories" :key="cat.id" :value="cat.id">
@@ -210,7 +211,7 @@ const incomeCategories = computed(() => {
             id="isRecurring"
             v-model="form.isRecurring"
             type="checkbox"
-            class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
+            class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-2 focus:ring-primary-500"
           />
           <label for="isRecurring" class="ml-2 block text-sm font-medium text-gray-700">
             Ingreso recurrente (fijo)
@@ -226,7 +227,7 @@ const incomeCategories = computed(() => {
             id="frequency"
             v-model="form.frequency"
             required
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             <option value="">Seleccionar...</option>
             <option value="weekly">Semanal</option>
@@ -247,7 +248,7 @@ const incomeCategories = computed(() => {
           id="notes"
           v-model="form.notes"
           rows="3"
-          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
           placeholder="Información adicional..."
         ></textarea>
       </div>

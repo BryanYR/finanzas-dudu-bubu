@@ -1,5 +1,11 @@
 <script setup lang="ts">
 import type { CreditCard, CardStatement } from '#types/tarjeta'
+import PlusIcon from '@components/icons/common/PlusIcon.vue'
+import EditIcon from '@components/icons/common/EditIcon.vue'
+import DeleteIcon from '@components/icons/common/DeleteIcon.vue'
+import HistoryIcon from '@components/icons/common/HistoryIcon.vue'
+import PaymentIcon from '@components/icons/common/PaymentIcon.vue'
+import CardIcon from '@components/icons/tarjetas/CardIcon.vue'
 
 definePageMeta({
   layout: 'default',
@@ -12,6 +18,7 @@ const {
   error,
   refresh,
 } = await useFetchAuth<CreditCard[]>('/api/credit-cards')
+const $authFetch = useAuthFetch()
 
 // Obtener estados de cuenta de cada tarjeta activa
 const cardStatements = ref<Record<number, CardStatement>>({})
@@ -27,7 +34,7 @@ const loadStatements = async () => {
     await Promise.all(
       activeCards.map(async (card) => {
         try {
-          const data = await $fetch(`/api/credit-cards/${card.id}/statement`)
+          const data = await $authFetch(`/api/credit-cards/${card.id}/statement`)
           cardStatements.value[card.id] = data.statement
         } catch (err) {
           console.error(`Error al cargar estado de cuenta de tarjeta ${card.id}:`, err)
@@ -123,7 +130,7 @@ const deleteCard = async () => {
 
   deleting.value = true
   try {
-    await $fetch(`/api/credit-cards/${cardToDelete.value.id}`, {
+    await $authFetch(`/api/credit-cards/${cardToDelete.value.id}`, {
       method: 'DELETE',
     })
     showDeleteModal.value = false
@@ -141,9 +148,9 @@ const { $dayjs } = useNuxtApp()
 const dayjs = $dayjs as typeof import('dayjs')
 
 const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('es-EC', {
+  return new Intl.NumberFormat('es-PE', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'PEN',
   }).format(amount)
 }
 
@@ -163,84 +170,58 @@ const formatDate = (dateString: string | undefined) => {
       </div>
       <UiButton @click="openCreateModal" variant="primary">
         <template #default>
-          <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
+          <PlusIcon custom-class="mr-2 h-10 w-10" />
           Nueva Tarjeta
         </template>
       </UiButton>
     </div>
 
     <!-- Filters -->
-    <div class="rounded-lg bg-white p-4 shadow-sm">
-      <div class="flex flex-wrap gap-4">
-        <button
+    <div class="rounded-xl bg-white p-4 shadow-sm">
+      <div class="flex flex-wrap gap-3">
+        <UiButton
           @click="filterActive = 'all'"
-          :class="[
-            'rounded-lg px-4 py-2 text-sm font-medium transition-colors',
-            filterActive === 'all'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
-          ]"
+          :variant="filterActive === 'all' ? 'primary' : 'outline'"
+          size="sm"
         >
           Todas
-        </button>
-        <button
+        </UiButton>
+        <UiButton
           @click="filterActive = 'active'"
-          :class="[
-            'rounded-lg px-4 py-2 text-sm font-medium transition-colors',
-            filterActive === 'active'
-              ? 'bg-green-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
-          ]"
+          :variant="filterActive === 'active' ? 'primary' : 'outline'"
+          size="sm"
         >
           Activas
-        </button>
-        <button
+        </UiButton>
+        <UiButton
           @click="filterActive = 'inactive'"
-          :class="[
-            'rounded-lg px-4 py-2 text-sm font-medium transition-colors',
-            filterActive === 'inactive'
-              ? 'bg-gray-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
-          ]"
+          :variant="filterActive === 'inactive' ? 'secondary' : 'outline'"
+          size="sm"
         >
           Inactivas
-        </button>
+        </UiButton>
       </div>
     </div>
 
     <!-- Loading State -->
     <div v-if="pending" class="flex items-center justify-center py-12">
       <div
-        class="h-12 w-12 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"
+        class="h-12 w-12 animate-spin rounded-full border-4 border-primary-600 border-t-transparent"
       ></div>
     </div>
 
     <!-- Error State -->
-    <div v-else-if="error" class="rounded-lg bg-red-50 p-4 text-red-800">
+    <div v-else-if="error" class="rounded-xl bg-red-50 p-4 text-red-800">
       Error al cargar las tarjetas: {{ error.message }}
     </div>
 
     <!-- Cards View (Activas con saldo pendiente) -->
     <div v-else-if="filterActive !== 'inactive'" class="space-y-6">
       <!-- Resumen de deudas pendientes -->
-      <div class="rounded-xl bg-gradient-to-br from-orange-500 to-red-600 p-6 text-white shadow-lg">
+      <div class="rounded-xl bg-amber-600 p-6 text-white shadow-sm">
         <div class="mb-2 flex items-center justify-between">
-          <h2 class="text-lg font-semibold">💳 Deuda Total en Tarjetas</h2>
-          <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-            />
-          </svg>
+          <h2 class="text-lg font-semibold">Deuda Total en Tarjetas</h2>
+          <CardIcon custom-class="h-8 w-8" />
         </div>
         <p class="text-4xl font-bold">
           {{
@@ -257,12 +238,10 @@ const formatDate = (dateString: string | undefined) => {
         <div
           v-for="card in filteredCards.filter((c) => c.isActive)"
           :key="card.id"
-          class="rounded-xl bg-white shadow-md transition-shadow hover:shadow-lg"
+          class="rounded-xl bg-white shadow-sm transition-shadow hover:shadow-md"
         >
-          <!-- Card Header con gradiente -->
-          <div
-            class="flex items-start justify-between rounded-t-xl bg-gradient-to-r from-indigo-500 to-purple-600 p-6 text-white"
-          >
+          <!-- Card Header: representación flat de la tarjeta física -->
+          <div class="flex items-start justify-between rounded-t-xl bg-gray-900 p-6 text-white">
             <div>
               <h3 class="text-xl font-bold">{{ card.name }}</h3>
               <p class="mt-1 text-sm opacity-90">{{ card.bank }}</p>
@@ -274,28 +253,14 @@ const formatDate = (dateString: string | undefined) => {
                 class="rounded-lg p-2 text-white/80 transition-colors hover:bg-white/20 hover:text-white"
                 title="Historial de Pagos"
               >
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
-                  />
-                </svg>
+                <HistoryIcon custom-class="h-5 w-5" />
               </button>
               <button
                 @click="openEditModal(card)"
                 class="rounded-lg p-2 text-white/80 transition-colors hover:bg-white/20 hover:text-white"
                 title="Editar"
               >
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                  />
-                </svg>
+                <EditIcon custom-class="h-5 w-5" />
               </button>
             </div>
           </div>
@@ -304,18 +269,18 @@ const formatDate = (dateString: string | undefined) => {
           <div class="p-6">
             <div v-if="loadingStatements" class="flex items-center justify-center py-8">
               <div
-                class="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"
+                class="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent"
               ></div>
             </div>
 
             <div v-else-if="cardStatements[card.id]" class="space-y-4">
               <!-- Saldo pendiente -->
-              <div class="rounded-lg bg-orange-50 p-4">
-                <p class="text-sm font-medium text-orange-800">Deuda del Periodo Actual</p>
-                <p class="mt-1 text-3xl font-bold text-orange-900">
+              <div class="rounded-lg bg-amber-50 p-4">
+                <p class="text-sm font-medium text-amber-800">Deuda del Periodo Actual</p>
+                <p class="mt-1 text-3xl font-bold text-amber-900">
                   {{ formatCurrency(cardStatements[card.id]?.totalAmount ?? 0) }}
                 </p>
-                <div class="mt-3 flex items-center justify-between text-sm text-orange-700">
+                <div class="mt-3 flex items-center justify-between text-sm text-amber-700">
                   <span
                     >Pagar antes del {{ formatDate(cardStatements[card.id]?.paymentDueDate) }}</span
                   >
@@ -331,13 +296,18 @@ const formatDate = (dateString: string | undefined) => {
                 </div>
 
                 <!-- Botón de pago -->
-                <button
+                <UiButton
                   v-if="(cardStatements[card.id]?.totalAmount ?? 0) > 0"
                   @click="openPaymentModal(card, cardStatements[card.id]?.totalAmount ?? 0)"
-                  class="mt-3 w-full rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-700"
+                  variant="success"
+                  full-width
+                  class="mt-3"
                 >
-                  💳 Registrar Pago
-                </button>
+                  <template #default>
+                    <PaymentIcon custom-class="mr-2 h-5 w-5" />
+                    Registrar Pago
+                  </template>
+                </UiButton>
               </div>
 
               <!-- Límite de crédito -->
@@ -355,7 +325,7 @@ const formatDate = (dateString: string | undefined) => {
                       (cardStatements[card.id]?.creditUsagePercent ?? 0) > 80
                         ? 'bg-red-500'
                         : (cardStatements[card.id]?.creditUsagePercent ?? 0) > 50
-                          ? 'bg-yellow-500'
+                          ? 'bg-amber-500'
                           : 'bg-green-500',
                     ]"
                     :style="{ width: (cardStatements[card.id]?.creditUsagePercent ?? 0) + '%' }"
@@ -373,11 +343,21 @@ const formatDate = (dateString: string | undefined) => {
               <div class="grid grid-cols-2 gap-4 rounded-lg bg-gray-50 p-4">
                 <div>
                   <p class="text-xs text-gray-600">Corte</p>
-                  <p class="text-sm font-semibold text-gray-900">Día {{ card.billingDay }}</p>
+                  <p class="text-sm font-semibold text-gray-900">
+                    {{
+                      formatDate(cardStatements[card.id]?.billingEndDate) ||
+                      `Día ${card.billingDay}`
+                    }}
+                  </p>
                 </div>
                 <div>
                   <p class="text-xs text-gray-600">Pago</p>
-                  <p class="text-sm font-semibold text-gray-900">Día {{ card.paymentDay }}</p>
+                  <p class="text-sm font-semibold text-gray-900">
+                    {{
+                      formatDate(cardStatements[card.id]?.paymentDueDate) ||
+                      `Día ${card.paymentDay}`
+                    }}
+                  </p>
                 </div>
               </div>
             </div>
@@ -392,21 +372,9 @@ const formatDate = (dateString: string | undefined) => {
       <!-- Empty state para activas -->
       <div
         v-if="filteredCards.filter((c) => c.isActive).length === 0"
-        class="rounded-lg bg-white p-12 text-center shadow-sm"
+        class="rounded-xl bg-white p-12 text-center shadow-sm"
       >
-        <svg
-          class="mx-auto h-12 w-12 text-gray-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-          />
-        </svg>
+        <CardIcon custom-class="mx-auto h-10 w-10 text-gray-400" />
         <h3 class="mt-2 text-sm font-medium text-gray-900">No hay tarjetas activas</h3>
         <p class="mt-1 text-sm text-gray-500">Comienza agregando una nueva tarjeta de crédito.</p>
       </div>
@@ -445,50 +413,24 @@ const formatDate = (dateString: string | undefined) => {
         <div class="flex items-center gap-2">
           <button
             @click="openEditModal(item)"
-            class="rounded-lg p-2 text-indigo-600 transition-colors hover:bg-indigo-50"
+            class="rounded-lg p-2 text-primary-600 transition-colors hover:bg-primary-50"
             title="Editar"
           >
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-              />
-            </svg>
+            <EditIcon custom-class="h-5 w-5" />
           </button>
           <button
             @click="openDeleteModal(item)"
             class="rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50"
             title="Eliminar"
           >
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-              />
-            </svg>
+            <DeleteIcon custom-class="h-5 w-5" />
           </button>
         </div>
       </template>
 
       <template #empty>
         <div class="text-center">
-          <svg
-            class="mx-auto h-12 w-12 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-            />
-          </svg>
+          <CardIcon custom-class="mx-auto h-10 w-10 text-gray-400" />
           <h3 class="mt-2 text-sm font-medium text-gray-900">No hay tarjetas</h3>
           <p class="mt-1 text-sm text-gray-500">Comienza agregando una nueva tarjeta de crédito.</p>
         </div>

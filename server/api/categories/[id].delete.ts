@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import { prisma } from '@server/utils/db'
 import { getUserFromSession } from '@server/utils/auth'
 
@@ -12,6 +13,22 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'Categoría no encontrada' })
   }
 
-  await prisma.category.delete({ where: { id } })
+  try {
+    await prisma.category.delete({ where: { id } })
+  } catch (error) {
+    // La relación Income/Expense -> Category es onDelete: Restrict; Postgres
+    // rechaza el delete con una violación de FK si hay movimientos asociados.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      (error.code === 'P2003' || error.code === 'P2014')
+    ) {
+      throw createError({
+        statusCode: 409,
+        message: 'No se puede eliminar una categoría con ingresos o gastos asociados',
+      })
+    }
+    throw error
+  }
+
   return { message: 'Categoría eliminada' }
 })

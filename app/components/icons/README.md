@@ -85,10 +85,10 @@ Todos los iconos aceptan una prop `customClass` para personalizar estilos:
 <template>
   <!-- Tamaño personalizado -->
   <PlusIcon custom-class="h-8 w-8" />
-  
+
   <!-- Color personalizado -->
   <PlusIcon custom-class="text-blue-600" />
-  
+
   <!-- Múltiples clases -->
   <PlusIcon custom-class="h-6 w-6 text-red-500 hover:text-red-700" />
 </template>
@@ -98,9 +98,9 @@ Todos los iconos aceptan una prop `customClass` para personalizar estilos:
 
 Todos los componentes de iconos aceptan las siguientes props:
 
-| Prop | Tipo | Requerido | Descripción |
-|------|------|-----------|-------------|
-| `customClass` | `string` | No | Clases de Tailwind CSS adicionales |
+| Prop          | Tipo     | Requerido | Descripción                        |
+| ------------- | -------- | --------- | ---------------------------------- |
+| `customClass` | `string` | No        | Clases de Tailwind CSS adicionales |
 
 ## Tamaños por Defecto
 
@@ -124,6 +124,7 @@ Puedes sobreescribir el tamaño usando `customClass`:
 ## Migración de SVG Inline
 
 ### Antes ❌
+
 ```vue
 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -131,6 +132,7 @@ Puedes sobreescribir el tamaño usando `customClass`:
 ```
 
 ### Después ✅
+
 ```vue
 <script setup lang="ts">
 import PlusIcon from '@components/icons/common/PlusIcon.vue'
@@ -157,20 +159,9 @@ import PlusIcon from '@components/icons/common/PlusIcon.vue'
 
 ```vue
 <template>
-  <svg
-    class="h-5 w-5"
-    :class="customClass"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
+  <svg class="h-5 w-5" :class="customClass" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <!-- Tu path SVG aquí -->
-    <path
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      stroke-width="2"
-      d="..."
-    />
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="..." />
   </svg>
 </template>
 

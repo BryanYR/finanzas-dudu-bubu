@@ -1,5 +1,5 @@
 <template>
-  <svg class="h-8 w-8" :class="customClass" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  <svg :class="customClass || 'h-8 w-8'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path
       stroke-linecap="round"
       stroke-linejoin="round"
