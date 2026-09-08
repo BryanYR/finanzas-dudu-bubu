@@ -1,24 +1,8 @@
 <script setup lang="ts">
+import type { Debt, DebtPayment } from '#types/deuda'
 import DocumentTextIcon from '@components/icons/common/DocumentTextIcon.vue'
-
-interface Payment {
-  id: number
-  amount: number
-  principal: number
-  interest: number
-  insurance: number
-  date: string
-  paymentNumber: number
-  notes?: string
-}
-
-interface Debt {
-  id: number
-  name: string
-  creditor: string
-  totalAmount: number
-  remainingAmount: number
-}
+import EditIcon from '@components/icons/common/EditIcon.vue'
+import DeleteIcon from '@components/icons/common/DeleteIcon.vue'
 
 const props = defineProps<{
   debt: Debt | null
@@ -27,11 +11,16 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:show': [value: boolean]
+  deleted: []
 }>()
 
-const payments = ref<Payment[]>([])
+const payments = ref<DebtPayment[]>([])
 const loading = ref(false)
+const deleting = ref<number | null>(null)
 const $authFetch = useAuthFetch()
+const confirm = useConfirm()
+const showEditModal = ref(false)
+const editingPayment = ref<DebtPayment | null>(null)
 
 // Fetch payments when modal opens
 watch(
@@ -48,7 +37,7 @@ const fetchPayments = async () => {
 
   loading.value = true
   try {
-    const data = await $authFetch<Payment[]>(`/api/debts/${props.debt.id}/payments`)
+    const data = await $authFetch<DebtPayment[]>(`/api/debts/${props.debt.id}/payments`)
     payments.value = data
   } catch (err) {
     console.error('Error al cargar pagos:', err)
@@ -75,6 +64,41 @@ const totalInsurance = computed(() => {
 })
 
 const { formatDate, formatCurrency } = useDateFormatter()
+
+const handleEditPayment = (payment: DebtPayment) => {
+  editingPayment.value = payment
+  showEditModal.value = true
+}
+
+const onPaymentSaved = async () => {
+  await fetchPayments()
+  emit('deleted') // reuse to trigger parent refresh (debt list)
+}
+
+const handleDeletePayment = async (payment: DebtPayment) => {
+  if (!props.debt) return
+
+  const ok = await confirm.confirm({
+    title: 'Eliminar pago',
+    message: `¿Eliminar el pago de cuota #${payment.paymentNumber} por ${formatCurrency(payment.amount)}? Esta acción revertirá el saldo de la deuda.`,
+    confirmText: 'Eliminar',
+    danger: true,
+  })
+  if (!ok) return
+
+  deleting.value = payment.id
+  try {
+    await $authFetch(`/api/debts/${props.debt.id}/payments/${payment.id}`, { method: 'DELETE' })
+    useToast().success('Pago eliminado correctamente')
+    await fetchPayments()
+    emit('deleted')
+  } catch (err) {
+    console.error('Error al eliminar pago:', err)
+    useToast().error('Error al eliminar el pago')
+  } finally {
+    deleting.value = null
+  }
+}
 </script>
 
 <template>
@@ -134,7 +158,7 @@ const { formatDate, formatCurrency } = useDateFormatter()
       <!-- Loading -->
       <div v-if="loading" class="flex items-center justify-center py-12">
         <div
-          class="h-12 w-12 animate-spin rounded-full border-4 border-primary-600 border-t-transparent"
+          class="h-12 w-12 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"
         ></div>
       </div>
 
@@ -147,11 +171,11 @@ const { formatDate, formatCurrency } = useDateFormatter()
             :key="payment.id"
             class="rounded-lg border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md"
           >
-            <div class="flex items-start justify-between">
+            <div class="flex items-start justify-between gap-3">
               <div class="flex-1">
                 <div class="flex items-center gap-2">
                   <span
-                    class="inline-flex items-center rounded-full bg-primary-100 px-2 py-1 text-xs font-semibold text-primary-800"
+                    class="inline-flex items-center rounded-full bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-800"
                   >
                     Cuota #{{ payment.paymentNumber }}
                   </span>
@@ -185,6 +209,34 @@ const { formatDate, formatCurrency } = useDateFormatter()
                   {{ payment.notes }}
                 </p>
               </div>
+              <button
+                type="button"
+                @click="handleEditPayment(payment)"
+                class="shrink-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
+                title="Editar pago"
+              >
+                <EditIcon custom-class="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                :disabled="deleting === payment.id"
+                @click="handleDeletePayment(payment)"
+                class="shrink-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                title="Eliminar pago"
+              >
+                <DeleteIcon v-if="deleting !== payment.id" custom-class="h-4 w-4" />
+                <svg v-else class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle
+                    class="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    stroke-width="4"
+                  />
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+              </button>
             </div>
           </div>
         </div>
@@ -204,4 +256,11 @@ const { formatDate, formatCurrency } = useDateFormatter()
       </div>
     </template>
   </UiModal>
+
+  <DeudasDebtPaymentModal
+    v-model:show="showEditModal"
+    :debt="debt"
+    :payment="editingPayment"
+    @save="onPaymentSaved"
+  />
 </template>

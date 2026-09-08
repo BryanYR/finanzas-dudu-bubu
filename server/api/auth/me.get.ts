@@ -1,8 +1,7 @@
-import { getUserFromSession } from '@server/utils/auth'
+import { requireUser } from '@server/utils/auth'
 
 export default defineEventHandler(async (event) => {
-  const user = await getUserFromSession(event)
-  if (!user) throw createError({ statusCode: 401 })
+  const user = await requireUser(event)
 
   return {
     id: user.id,

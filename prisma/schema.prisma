@@ -82,8 +82,11 @@ model Expense {
   userId        Int
   paymentMethod String   @default("cash") // "cash" | "debit" | "credit"
   creditCardId  Int? // Opcional: si se pagó con tarjeta de crédito
-  isPaidOff     Boolean  @default(false) // Para gastos con tarjeta: marca si el estado de cuenta ya fue pagado
-  notes         String?
+  isPaidOff         Boolean  @default(false) // Para gastos con tarjeta: marca si el estado de cuenta ya fue pagado
+  installments      Int? // Número de cuotas (solo para tarjeta de crédito, null = pago único)
+  installmentAmount Decimal? @db.Decimal(12, 2) // Cuota mensual real calculada (capital + interés / n)
+  totalWithInterest Decimal? @db.Decimal(12, 2) // Total a pagar incluyendo intereses
+  notes             String?
 
   category   Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -100,17 +103,18 @@ model Expense {
 
 // ========== TARJETAS DE CRÉDITO ==========
 model CreditCard {
-  id             Int     @id @default(autoincrement())
-  name           String // Ej: "Visa Gold", "MasterCard Platinum"
-  bank           String // Banco emisor
-  lastDigits     String // Últimos 4 dígitos
-  creditLimit    Decimal @db.Decimal(12, 2) // Límite de crédito
-  billingDay     Int // Día de corte (1-31)
-  paymentDay     Int // Día de pago (1-31)
-  interestRate   Float? // Tasa de interés anual (opcional)
-  carriedBalance Decimal @default(0) @db.Decimal(12, 2) // Saldo que no proviene de Expense (cuotas en curso, deuda previa a usar la app); se actualiza a mano con cada estado de cuenta
-  isActive       Boolean @default(true)
-  userId         Int
+  id              Int     @id @default(autoincrement())
+  name            String // Ej: "Visa Gold", "MasterCard Platinum"
+  bank            String // Banco emisor
+  lastDigits      String // Últimos 4 dígitos
+  creditLimit     Decimal @db.Decimal(12, 2) // Límite de crédito
+  billingDay      Int // Día de corte (1-31)
+  paymentDay      Int // Día de pago (1-31)
+  interestRate    Float? // TEA - Tasa Efectiva Anual (fallback para cálculo de cuotas)
+  installmentFees Json? // {"2": 15.806, "3": 19.156, ...} - % interés total sobre capital por n cuotas
+  carriedBalance  Decimal @default(0) @db.Decimal(12, 2) // Saldo que no proviene de Expense (cuotas en curso, deuda previa a usar la app); se actualiza a mano con cada estado de cuenta
+  isActive        Boolean @default(true)
+  userId          Int
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   expenses Expense[]

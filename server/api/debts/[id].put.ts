@@ -1,11 +1,10 @@
 import { prisma } from '@server/utils/db'
-import { getUserFromSession } from '@server/utils/auth'
+import { requireUser } from '@server/utils/auth'
 import { validateBody, DebtUpdateSchema } from '@server/utils/validation'
 import { serializeDecimals } from '@server/utils/serialize'
 
 export default defineEventHandler(async (event) => {
-  const user = await getUserFromSession(event)
-  if (!user) throw createError({ statusCode: 401 })
+  const user = await requireUser(event)
 
   const id = Number(event.context.params?.id)
   const body = validateBody(DebtUpdateSchema, await readBody(event))
@@ -53,7 +52,7 @@ export default defineEventHandler(async (event) => {
   const totalAmount = Number(body.totalAmount ?? debt.totalAmount)
   const interestRate = body.interestRate ?? debt.interestRate
   const monthlyPayment = Number(body.monthlyPayment ?? debt.monthlyPayment)
-  const totalInstallments = body.totalInstallments ?? debt.totalInstallments
+  const totalInstallments = body.totalInstallments ?? debt.totalInstallments ?? 12
   const paymentDay = body.paymentDayOfMonth ?? debt.paymentDayOfMonth
   const startDate = body.startDate ? new Date(body.startDate) : debt.startDate
   const remainingAmount = Number(body.remainingAmount ?? debt.remainingAmount)

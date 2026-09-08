@@ -1,19 +1,11 @@
 <script setup lang="ts">
+import type { Debt, DebtPayment } from '#types/deuda'
 import InfoIcon from '@components/icons/common/InfoIcon.vue'
-
-interface Debt {
-  id: number
-  name: string
-  creditor: string
-  remainingAmount: number
-  monthlyPayment: number
-  interestRate: number
-  totalPayments?: number
-}
 
 const props = defineProps<{
   debt: Debt | null
   show: boolean
+  payment?: DebtPayment | null
 }>()
 
 const emit = defineEmits<{
@@ -21,8 +13,11 @@ const emit = defineEmits<{
   save: []
 }>()
 
+const isEditMode = computed(() => !!props.payment)
+const modalTitle = computed(() => (isEditMode.value ? 'Editar Pago' : 'Registrar Pago de Deuda'))
+
 const saving = ref(false)
-const { today, toISOString } = useDateFormatter()
+const { today, toISOString, formatCurrency, formatDate } = useDateFormatter()
 const $authFetch = useAuthFetch()
 
 const form = reactive({
@@ -37,14 +32,24 @@ const form = reactive({
 
 const resetForm = () => {
   manualEdit.value = false
-  form.amount = props.debt?.monthlyPayment || 0
-  form.principal = 0
-  form.interest = 0
-  form.insurance = 0
-  form.date = today()
-  form.paymentNumber = (props.debt?.totalPayments || 0) + 1
-  form.notes = ''
-  calculateSplit()
+  if (props.payment) {
+    form.amount = props.payment.amount
+    form.principal = props.payment.principal
+    form.interest = props.payment.interest
+    form.insurance = props.payment.insurance
+    form.date = formatDate(props.payment.date, 'YYYY-MM-DD')
+    form.paymentNumber = props.payment.paymentNumber
+    form.notes = props.payment.notes || ''
+  } else {
+    form.amount = props.debt?.monthlyPayment || 0
+    form.principal = 0
+    form.interest = 0
+    form.insurance = 0
+    form.date = today()
+    form.paymentNumber = (props.debt?.totalPayments || 0) + 1
+    form.notes = ''
+    calculateSplit()
+  }
 }
 
 // Watch debt prop to populate form
@@ -115,13 +120,14 @@ watch(
 const handleSave = async () => {
   if (!props.debt) return
 
+  const toast = useToast()
   if (form.amount <= 0) {
-    alert('El monto del pago debe ser mayor a 0')
+    toast.warning('El monto del pago debe ser mayor a 0')
     return
   }
 
   if (form.principal < 0) {
-    alert('El monto del pago no cubre los intereses generados')
+    toast.warning('El monto del pago no cubre los intereses generados')
     return
   }
 
@@ -138,16 +144,23 @@ const handleSave = async () => {
   }
 
   try {
-    await $authFetch(`/api/debts/${props.debt.id}/pay`, {
-      method: 'POST',
-      body: dataToSend,
-    })
+    if (isEditMode.value && props.payment) {
+      await $authFetch(`/api/debts/${props.debt.id}/payments/${props.payment.id}`, {
+        method: 'PUT',
+        body: dataToSend,
+      })
+    } else {
+      await $authFetch(`/api/debts/${props.debt.id}/pay`, {
+        method: 'POST',
+        body: dataToSend,
+      })
+    }
     emit('save')
     emit('update:show', false)
     setTimeout(() => resetForm(), 300)
   } catch (err) {
     console.error('Error al registrar pago:', err)
-    alert('Error al registrar el pago')
+    useToast().error(isEditMode.value ? 'Error al editar el pago' : 'Error al registrar el pago')
   } finally {
     saving.value = false
   }
@@ -158,7 +171,7 @@ const handleSave = async () => {
   <UiModal
     :model-value="show"
     @update:model-value="emit('update:show', false)"
-    title="Registrar Pago de Deuda"
+    :title="modalTitle"
     size="xl"
   >
     <form v-if="debt" @submit.prevent="handleSave" class="space-y-4">
@@ -168,14 +181,7 @@ const handleSave = async () => {
         <p class="text-sm text-gray-600">{{ debt.creditor }}</p>
         <div class="mt-2 flex items-center justify-between text-sm">
           <span class="text-gray-600">Saldo pendiente:</span>
-          <span class="font-semibold text-red-600">
-            {{
-              new Intl.NumberFormat('es-PE', {
-                style: 'currency',
-                currency: 'PEN',
-              }).format(debt.remainingAmount)
-            }}
-          </span>
+          <span class="font-semibold text-red-600">{{ formatCurrency(debt.remainingAmount) }}</span>
         </div>
       </div>
 
@@ -186,7 +192,7 @@ const handleSave = async () => {
           <!-- Monto del pago -->
           <div>
             <label for="amount" class="block text-sm font-medium text-gray-700">
-              Monto del pago <span class="text-red-500">*</span>
+              Monto total pagado <span class="text-red-500">*</span>
             </label>
             <input
               id="amount"
@@ -195,17 +201,14 @@ const handleSave = async () => {
               required
               min="0"
               step="0.01"
-              class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="0.00"
             />
-            <p class="mt-1 text-xs text-gray-500">
-              Cuota sugerida:
-              {{
-                new Intl.NumberFormat('es-PE', {
-                  style: 'currency',
-                  currency: 'PEN',
-                }).format(debt.monthlyPayment)
-              }}
+            <p class="mt-1 text-xs font-medium text-indigo-600">
+              Ingresa el total que pagaste al banco (cuota + seguro de desgravamen)
+            </p>
+            <p class="mt-0.5 text-xs text-gray-400">
+              Cuota base sugerida: {{ formatCurrency(debt.monthlyPayment) }}
             </p>
           </div>
 
@@ -220,7 +223,7 @@ const handleSave = async () => {
               type="number"
               min="0"
               step="0.01"
-              class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="0.00"
             />
             <p class="mt-1 text-xs text-gray-500">
@@ -238,7 +241,7 @@ const handleSave = async () => {
               v-model="form.date"
               type="date"
               required
-              class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
@@ -253,7 +256,7 @@ const handleSave = async () => {
               type="number"
               required
               min="1"
-              class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
         </div>
@@ -294,12 +297,7 @@ const handleSave = async () => {
                 <div
                   class="mt-1 w-full rounded border border-blue-200 bg-blue-100 px-3 py-2 text-sm font-semibold text-blue-900"
                 >
-                  {{
-                    new Intl.NumberFormat('es-PE', {
-                      style: 'currency',
-                      currency: 'PEN',
-                    }).format(form.principal)
-                  }}
+                  {{ formatCurrency(form.principal) }}
                 </div>
                 <p class="mt-1 text-xs text-blue-600">Calculado: Monto - Interés - Seguro</p>
               </div>
@@ -308,48 +306,28 @@ const handleSave = async () => {
                 <div class="space-y-1 text-sm">
                   <div class="flex items-center justify-between">
                     <span class="text-blue-800">Capital:</span>
-                    <span class="font-semibold text-green-700">
-                      {{
-                        new Intl.NumberFormat('es-PE', {
-                          style: 'currency',
-                          currency: 'PEN',
-                        }).format(form.principal)
-                      }}
-                    </span>
+                    <span class="font-semibold text-green-700">{{
+                      formatCurrency(form.principal)
+                    }}</span>
                   </div>
                   <div class="flex items-center justify-between">
                     <span class="text-blue-800">Interés:</span>
-                    <span class="font-semibold text-orange-700">
-                      {{
-                        new Intl.NumberFormat('es-PE', {
-                          style: 'currency',
-                          currency: 'PEN',
-                        }).format(form.interest)
-                      }}
-                    </span>
+                    <span class="font-semibold text-orange-700">{{
+                      formatCurrency(form.interest)
+                    }}</span>
                   </div>
                   <div class="flex items-center justify-between">
                     <span class="text-blue-800">Seguro:</span>
-                    <span class="font-semibold text-purple-700">
-                      {{
-                        new Intl.NumberFormat('es-PE', {
-                          style: 'currency',
-                          currency: 'PEN',
-                        }).format(form.insurance)
-                      }}
-                    </span>
+                    <span class="font-semibold text-purple-700">{{
+                      formatCurrency(form.insurance)
+                    }}</span>
                   </div>
                   <div class="border-t border-blue-300 pt-2">
                     <div class="flex items-center justify-between">
                       <span class="font-medium text-blue-900">Total:</span>
-                      <span class="text-lg font-bold text-blue-900">
-                        {{
-                          new Intl.NumberFormat('es-PE', {
-                            style: 'currency',
-                            currency: 'PEN',
-                          }).format(form.amount)
-                        }}
-                      </span>
+                      <span class="text-lg font-bold text-blue-900">{{
+                        formatCurrency(form.amount)
+                      }}</span>
                     </div>
                   </div>
                 </div>
@@ -358,8 +336,8 @@ const handleSave = async () => {
             <p class="mt-3 flex items-start gap-1 text-xs text-blue-700">
               <InfoIcon custom-class="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
               <span>
-                Puedes editar el interés manualmente según tu estado de cuenta (BCP usa tasa
-                compensatoria)
+                El interés es editable. Úsalo para ingresar el valor exacto de tu estado de cuenta
+                (los bancos pueden redondear distinto que la fórmula matemática).
               </span>
             </p>
           </div>
@@ -373,7 +351,7 @@ const handleSave = async () => {
           id="notes"
           v-model="form.notes"
           rows="2"
-          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           placeholder="Notas adicionales (opcional)"
         ></textarea>
       </div>
@@ -383,7 +361,7 @@ const handleSave = async () => {
       <div class="flex justify-end gap-3">
         <UiButton @click="emit('update:show', false)" variant="outline"> Cancelar </UiButton>
         <UiButton @click="handleSave" :loading="saving" variant="success">
-          Registrar Pago
+          {{ isEditMode ? 'Guardar Cambios' : 'Registrar Pago' }}
         </UiButton>
       </div>
     </template>

@@ -1,20 +1,6 @@
 <script setup lang="ts">
-interface Category {
-  id: number
-  name: string
-  type: string
-}
-
-interface Income {
-  id?: number
-  amount: number
-  description: string
-  date: string
-  isRecurring: boolean
-  frequency?: string
-  categoryId: number
-  notes?: string
-}
+import type { Income, IncomeInput } from '#types/ingreso'
+import type { Category } from '#types/categoria'
 
 const props = defineProps<{
   income?: Income | null
@@ -24,7 +10,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:show': [value: boolean]
-  save: [income: Income]
+  save: [income: IncomeInput]
 }>()
 
 const saving = ref(false)
@@ -58,7 +44,7 @@ watch(
     if (newIncome) {
       form.amount = newIncome.amount
       form.description = newIncome.description
-      form.date = newIncome.date.split('T')[0]
+      form.date = newIncome.date.slice(0, 10)
       form.isRecurring = newIncome.isRecurring
       form.frequency = newIncome.frequency || ''
       form.categoryId = newIncome.categoryId
@@ -79,7 +65,7 @@ watch(
     } else if (isShowing && props.income) {
       form.amount = props.income.amount
       form.description = props.income.description
-      form.date = props.income.date.split('T')[0]
+      form.date = props.income.date.slice(0, 10)
       form.isRecurring = props.income.isRecurring
       form.frequency = props.income.frequency || ''
       form.categoryId = props.income.categoryId
@@ -118,7 +104,7 @@ const handleSave = async () => {
     setTimeout(() => resetForm(), 300)
   } catch (err) {
     console.error('Error al guardar ingreso:', err)
-    alert('Error al guardar el ingreso')
+    useToast().error('Error al guardar el ingreso')
   } finally {
     saving.value = false
   }

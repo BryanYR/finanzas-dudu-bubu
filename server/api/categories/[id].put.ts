@@ -1,10 +1,9 @@
 import { prisma } from '@server/utils/db'
-import { getUserFromSession } from '@server/utils/auth'
+import { requireUser } from '@server/utils/auth'
 import { validateBody, CategoryUpdateSchema } from '@server/utils/validation'
 
 export default defineEventHandler(async (event) => {
-  const user = await getUserFromSession(event)
-  if (!user) throw createError({ statusCode: 401 })
+  const user = await requireUser(event)
 
   const id = Number(event.context.params?.id)
   const body = validateBody(CategoryUpdateSchema, await readBody(event))

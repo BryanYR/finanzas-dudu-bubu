@@ -46,7 +46,7 @@ watch(
 
 const handleSubmit = async () => {
   if (!form.name || form.targetAmount <= 0) {
-    alert('Por favor completa todos los campos requeridos')
+    useToast().warning('Por favor completa todos los campos requeridos')
     return
   }
 
@@ -79,7 +79,7 @@ const handleSubmit = async () => {
     resetForm()
   } catch (err) {
     console.error('Error al guardar:', err)
-    alert('Error al guardar la meta de ahorro')
+    useToast().error('Error al guardar la meta de ahorro')
   } finally {
     saving.value = false
   }

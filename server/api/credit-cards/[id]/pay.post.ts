@@ -1,10 +1,10 @@
 import { prisma } from '@server/utils/db'
-import { getUserFromSession } from '@server/utils/auth'
+import { requireUser } from '@server/utils/auth'
 import { validateBody, CreditCardPaymentSchema } from '@server/utils/validation'
+import { computeBillingWindows } from '@server/services/creditCardService'
 
 export default defineEventHandler(async (event) => {
-  const user = await getUserFromSession(event)
-  if (!user) throw createError({ statusCode: 401 })
+  const user = await requireUser(event)
 
   const id = Number(event.context.params?.id)
   if (!id || isNaN(id)) throw createError({ statusCode: 400, message: 'ID inválido' })
@@ -21,37 +21,22 @@ export default defineEventHandler(async (event) => {
   })
   if (!category) throw createError({ statusCode: 404, message: 'Categoría no encontrada' })
 
-  // Calcular el período que se está pagando (el último cerrado)
-  const now = new Date()
-  const currentDay = now.getDate()
+  // Obtener el período cerrado usando la misma lógica del servicio
+  const { lastClosed } = computeBillingWindows(card)
 
-  let billingStartDate: Date
-  let billingEndDate: Date
-
-  if (currentDay <= card.billingDay) {
-    // Todavía no llegamos al corte de este mes: el período cerrado es el del mes anterior
-    // (del día siguiente al corte de hace 2 meses, hasta el corte del mes pasado)
-    billingStartDate = new Date(now.getFullYear(), now.getMonth() - 2, card.billingDay + 1, 0, 0, 0)
-    billingEndDate = new Date(now.getFullYear(), now.getMonth() - 1, card.billingDay, 23, 59, 59)
-  } else {
-    // Ya pasó el corte de este mes: el período cerrado es el que acaba de cerrar
-    // (del día siguiente al corte del mes pasado, hasta el corte de este mes)
-    billingStartDate = new Date(now.getFullYear(), now.getMonth() - 1, card.billingDay + 1, 0, 0, 0)
-    billingEndDate = new Date(now.getFullYear(), now.getMonth(), card.billingDay, 23, 59, 59)
-  }
-
-  // Marcar todos los gastos de este período como pagados
+  // Marcar todos los gastos del período cerrado como pagados
   await prisma.expense.updateMany({
     where: {
       userId: user.id,
       creditCardId: id,
-      date: { gte: billingStartDate, lte: billingEndDate },
+      date: { gte: lastClosed.start, lte: lastClosed.end },
       isPaidOff: false,
     },
     data: { isPaidOff: true },
   })
 
-  // Crear un gasto que representa el pago de la tarjeta (sale de tu cuenta)
+  // Registrar el pago como un gasto de débito (sale de la cuenta bancaria); no se
+  // asocia a la tarjeta (creditCardId: null) porque es un débito, no un consumo con ella.
   await prisma.expense.create({
     data: {
       description: `Pago Tarjeta ${card.name} - ${card.bank}`,
@@ -59,6 +44,7 @@ export default defineEventHandler(async (event) => {
       date: body.date ? new Date(body.date) : new Date(),
       isRecurring: false,
       paymentMethod: 'debit' as const,
+      creditCardId: null,
       categoryId: body.categoryId,
       userId: user.id,
       isPaidOff: false,

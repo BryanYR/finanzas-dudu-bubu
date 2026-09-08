@@ -1,11 +1,10 @@
 import { prisma } from '@server/utils/db'
-import { getUserFromSession } from '@server/utils/auth'
+import { requireUser } from '@server/utils/auth'
 import { validateBody, DebtSchema } from '@server/utils/validation'
 import { serializeDecimals } from '@server/utils/serialize'
 
 export default defineEventHandler(async (event) => {
-  const user = await getUserFromSession(event)
-  if (!user) throw createError({ statusCode: 401 })
+  const user = await requireUser(event)
 
   const body = validateBody(DebtSchema, await readBody(event))
 

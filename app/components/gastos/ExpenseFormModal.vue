@@ -1,33 +1,9 @@
 <script setup lang="ts">
+import type { Expense, ExpenseInput } from '#types/gasto'
+import type { Category } from '#types/categoria'
+import type { CreditCard } from '#types/tarjeta'
 import DollarIcon from '@components/icons/gastos/DollarIcon.vue'
 import CardIcon from '@components/icons/tarjetas/CardIcon.vue'
-
-interface Category {
-  id: number
-  name: string
-  type: string
-}
-
-interface CreditCard {
-  id: number
-  name: string
-  bank: string
-  lastDigits: string
-  isActive?: boolean
-}
-
-interface Expense {
-  id?: number
-  amount: number
-  description: string
-  date: string
-  isRecurring: boolean
-  frequency?: string
-  categoryId: number
-  paymentMethod: string
-  creditCardId?: number
-  notes?: string
-}
 
 const props = defineProps<{
   expense?: Expense | null
@@ -38,7 +14,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:show': [value: boolean]
-  save: [expense: Expense]
+  save: [expense: ExpenseInput]
 }>()
 
 const saving = ref(false)
@@ -54,6 +30,7 @@ const form = reactive({
   categoryId: 0,
   paymentMethod: 'cash',
   creditCardId: 0,
+  installments: 1,
   notes: '',
 })
 
@@ -66,6 +43,7 @@ const resetForm = () => {
   form.categoryId = 0
   form.paymentMethod = 'cash'
   form.creditCardId = 0
+  form.installments = 1
   form.notes = ''
 }
 
@@ -76,12 +54,13 @@ watch(
     if (newExpense) {
       form.amount = newExpense.amount
       form.description = newExpense.description
-      form.date = newExpense.date.split('T')[0]
+      form.date = newExpense.date.slice(0, 10)
       form.isRecurring = newExpense.isRecurring
       form.frequency = newExpense.frequency || ''
       form.categoryId = newExpense.categoryId
       form.paymentMethod = newExpense.paymentMethod
       form.creditCardId = newExpense.creditCardId || 0
+      form.installments = newExpense.installments || 1
       form.notes = newExpense.notes || ''
     } else {
       resetForm()
@@ -99,23 +78,25 @@ watch(
     } else if (isShowing && props.expense) {
       form.amount = props.expense.amount
       form.description = props.expense.description
-      form.date = props.expense.date.split('T')[0]
+      form.date = props.expense.date.slice(0, 10)
       form.isRecurring = props.expense.isRecurring
       form.frequency = props.expense.frequency || ''
       form.categoryId = props.expense.categoryId
       form.paymentMethod = props.expense.paymentMethod
       form.creditCardId = props.expense.creditCardId || 0
+      form.installments = props.expense.installments || 1
       form.notes = props.expense.notes || ''
     }
   }
 )
 
-// Watch payment method to reset credit card when not using credit
+// Watch payment method to reset credit card and installments when not using credit
 watch(
   () => form.paymentMethod,
   (newMethod) => {
     if (newMethod !== 'credit') {
       form.creditCardId = 0
+      form.installments = 1
     }
   }
 )
@@ -133,6 +114,20 @@ const handleSave = async () => {
     paymentMethod: form.paymentMethod,
     creditCardId:
       form.paymentMethod === 'credit' && form.creditCardId ? Number(form.creditCardId) : undefined,
+    installments:
+      form.paymentMethod === 'credit' && form.installments > 1
+        ? Number(form.installments)
+        : undefined,
+    installmentAmount:
+      form.paymentMethod === 'credit' && installmentCost.value
+        ? installmentCost.value.monthlyPayment
+        : undefined,
+    totalWithInterest:
+      form.paymentMethod === 'credit' &&
+      installmentCost.value &&
+      installmentCost.value.totalInterest > 0
+        ? installmentCost.value.totalToPay
+        : undefined,
     notes: form.notes || undefined,
   }
 
@@ -153,20 +148,66 @@ const handleSave = async () => {
     setTimeout(() => resetForm(), 300)
   } catch (err) {
     console.error('Error al guardar gasto:', err)
-    alert('Error al guardar el gasto')
+    useToast().error('Error al guardar el gasto')
   } finally {
     saving.value = false
   }
 }
 
-// Computed para categorías de gastos
-const expenseCategories = computed(() => {
-  return props.categories.filter((cat) => cat.type === 'expense')
-})
+const expenseCategories = computed(() => props.categories.filter((cat) => cat.type === 'expense'))
 
-// Computed para tarjetas activas
-const activeCreditCards = computed(() => {
-  return props.creditCards.filter((card) => card.isActive !== false)
+const activeCreditCards = computed(() =>
+  props.creditCards.filter((card) => card.isActive !== false)
+)
+
+const selectedCard = computed(
+  () => props.creditCards.find((c) => c.id === form.creditCardId) ?? null
+)
+
+/**
+ * Calculates installment cost using:
+ * 1. installmentFees table (exact, from bank calculator)
+ * 2. TEA formula as fallback (annuity / French amortization)
+ * 3. Simple division if no rate info available
+ */
+const installmentCost = computed(() => {
+  if (form.paymentMethod !== 'credit' || form.installments <= 1 || form.amount <= 0) return null
+  const card = selectedCard.value
+  if (!card) return null
+
+  const n = Number(form.installments)
+  const principal = Number(form.amount)
+
+  // Option 1: fee table lookup (most accurate — exact bank data)
+  if (card.installmentFees) {
+    const feePercent = card.installmentFees[String(n)]
+    if (feePercent != null && feePercent > 0) {
+      const totalInterest = (principal * feePercent) / 100
+      const totalToPay = principal + totalInterest
+      const monthlyPayment = totalToPay / n
+      return { monthlyPayment, totalInterest, totalToPay, feePercent, source: 'table' as const }
+    }
+  }
+
+  // Option 2: TEA → TEM → annuity formula
+  if (card.interestRate && card.interestRate > 0) {
+    const tem = Math.pow(1 + card.interestRate / 100, 1 / 12) - 1
+    const monthlyPayment =
+      tem === 0 ? principal / n : (principal * tem) / (1 - Math.pow(1 + tem, -n))
+    const totalToPay = monthlyPayment * n
+    const totalInterest = totalToPay - principal
+    const feePercent = (totalInterest / principal) * 100
+    return { monthlyPayment, totalInterest, totalToPay, feePercent, source: 'tea' as const }
+  }
+
+  // Option 3: no rate info — show simple division, no interest
+  return {
+    monthlyPayment: principal / n,
+    totalInterest: 0,
+    totalToPay: principal,
+    feePercent: 0,
+    source: 'none' as const,
+  }
 })
 </script>
 
@@ -191,7 +232,7 @@ const activeCreditCards = computed(() => {
             required
             min="0"
             step="0.01"
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             placeholder="0.00"
           />
         </div>
@@ -206,7 +247,7 @@ const activeCreditCards = computed(() => {
             v-model="form.date"
             type="date"
             required
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
       </div>
@@ -221,7 +262,7 @@ const activeCreditCards = computed(() => {
           v-model="form.description"
           type="text"
           required
-          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           placeholder="Ej: Compra de supermercado"
         />
       </div>
@@ -235,7 +276,7 @@ const activeCreditCards = computed(() => {
           id="categoryId"
           v-model="form.categoryId"
           required
-          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
         >
           <option value="0">Seleccionar...</option>
           <option v-for="cat in expenseCategories" :key="cat.id" :value="cat.id">
@@ -245,10 +286,10 @@ const activeCreditCards = computed(() => {
       </div>
 
       <!-- Método de pago -->
-      <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
-        <label class="mb-3 block text-sm font-medium text-gray-700">
+      <fieldset class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+        <legend class="mb-3 block text-sm font-medium text-gray-700">
           Método de pago <span class="text-red-500">*</span>
-        </label>
+        </legend>
         <div class="grid grid-cols-3 gap-3">
           <label
             :class="[
@@ -291,23 +332,107 @@ const activeCreditCards = computed(() => {
         </div>
 
         <!-- Selector de tarjeta (solo si es crédito) -->
-        <div v-if="form.paymentMethod === 'credit'" class="mt-3">
-          <label for="creditCardId" class="mb-2 block text-sm font-medium text-gray-700">
-            Tarjeta de crédito <span class="text-red-500">*</span>
-          </label>
-          <select
-            id="creditCardId"
-            v-model="form.creditCardId"
-            required
-            class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-          >
-            <option value="0">Seleccionar tarjeta...</option>
-            <option v-for="card in activeCreditCards" :key="card.id" :value="card.id">
-              {{ card.name }} - {{ card.bank }} (••••{{ card.lastDigits }})
-            </option>
-          </select>
+        <div v-if="form.paymentMethod === 'credit'" class="mt-3 space-y-3">
+          <div>
+            <label for="creditCardId" class="mb-2 block text-sm font-medium text-gray-700">
+              Tarjeta de crédito <span class="text-red-500">*</span>
+            </label>
+            <select
+              id="creditCardId"
+              v-model="form.creditCardId"
+              required
+              class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="0">Seleccionar tarjeta...</option>
+              <option v-for="card in activeCreditCards" :key="card.id" :value="card.id">
+                {{ card.name }} - {{ card.bank }} (••••{{ card.lastDigits }})
+              </option>
+            </select>
+          </div>
+
+          <!-- Cuotas -->
+          <div>
+            <label for="installments" class="mb-2 block text-sm font-medium text-gray-700">
+              Número de cuotas
+            </label>
+            <input
+              id="installments"
+              v-model="form.installments"
+              type="number"
+              min="1"
+              max="60"
+              class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <p v-if="form.installments <= 1" class="mt-1 text-xs text-gray-500">
+              1 = pago único (sin cuotas)
+            </p>
+          </div>
+
+          <!-- Desglose de costo con intereses -->
+          <div v-if="installmentCost" class="rounded-xl border border-purple-200 bg-purple-50 p-3">
+            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-purple-700">
+              Desglose de cuotas
+              <span
+                v-if="installmentCost.source === 'table'"
+                class="ml-1 rounded-full bg-purple-200 px-1.5 py-0.5 text-[10px] font-normal normal-case text-purple-600"
+                >datos exactos del banco</span
+              >
+              <span
+                v-else-if="installmentCost.source === 'tea'"
+                class="ml-1 rounded-full bg-purple-200 px-1.5 py-0.5 text-[10px] font-normal normal-case text-purple-600"
+                >calculado con TEA</span
+              >
+              <span
+                v-else
+                class="ml-1 rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-normal normal-case text-gray-500"
+                >sin tasa configurada</span
+              >
+            </p>
+
+            <div class="grid grid-cols-3 gap-2 text-center">
+              <div class="rounded-lg bg-white p-2 ring-1 ring-purple-100">
+                <p class="text-base font-bold text-purple-700">
+                  {{
+                    new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(
+                      installmentCost.monthlyPayment
+                    )
+                  }}
+                </p>
+                <p class="text-[10px] text-gray-500">por cuota</p>
+              </div>
+              <div class="rounded-lg bg-white p-2 ring-1 ring-purple-100">
+                <p class="text-base font-bold text-gray-800">
+                  {{
+                    new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(
+                      installmentCost.totalToPay
+                    )
+                  }}
+                </p>
+                <p class="text-[10px] text-gray-500">total a pagar</p>
+              </div>
+              <div class="rounded-lg bg-white p-2 ring-1 ring-purple-100">
+                <p
+                  class="text-base font-bold"
+                  :class="installmentCost.totalInterest > 0 ? 'text-red-600' : 'text-emerald-600'"
+                >
+                  {{
+                    installmentCost.totalInterest > 0
+                      ? `+${new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(installmentCost.totalInterest)}`
+                      : 'Sin interés'
+                  }}
+                </p>
+                <p class="text-[10px] text-gray-500">
+                  {{
+                    installmentCost.totalInterest > 0
+                      ? `${installmentCost.feePercent.toFixed(2)}% sobre capital`
+                      : 'configurar tasa'
+                  }}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </fieldset>
 
       <!-- Gasto recurrente -->
       <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
@@ -316,7 +441,7 @@ const activeCreditCards = computed(() => {
             id="isRecurring"
             v-model="form.isRecurring"
             type="checkbox"
-            class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-2 focus:ring-primary-500"
+            class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
           />
           <label for="isRecurring" class="ml-2 block text-sm font-medium text-gray-700">
             Gasto recurrente (fijo)
@@ -332,7 +457,7 @@ const activeCreditCards = computed(() => {
             id="frequency"
             v-model="form.frequency"
             required
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
             <option value="">Seleccionar...</option>
             <option value="weekly">Semanal</option>
@@ -353,7 +478,7 @@ const activeCreditCards = computed(() => {
           id="notes"
           v-model="form.notes"
           rows="3"
-          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           placeholder="Información adicional..."
         ></textarea>
       </div>

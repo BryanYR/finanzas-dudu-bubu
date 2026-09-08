@@ -2,6 +2,8 @@
 import type { CreditCard } from '#types/tarjeta'
 import InfoIcon from '@components/icons/common/InfoIcon.vue'
 
+const { formatCurrency } = useDateFormatter()
+
 const props = defineProps<{
   show: boolean
   card: CreditCard | null
@@ -92,23 +94,16 @@ const handleSubmit = async () => {
     loading.value = false
   }
 }
-
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('es-PE', {
-    style: 'currency',
-    currency: 'PEN',
-  }).format(amount)
-}
 </script>
 
 <template>
   <UiModal v-model="localShow" title="Registrar Pago de Tarjeta" size="md">
     <form @submit.prevent="handleSubmit" class="space-y-4">
       <!-- Info de la tarjeta -->
-      <div v-if="card" class="rounded-lg bg-primary-50 p-4">
-        <p class="text-sm font-medium text-primary-900">{{ card.name }} - {{ card.bank }}</p>
-        <p class="text-xs text-primary-700">•••• •••• •••• {{ card.lastDigits }}</p>
-        <p v-if="suggestedAmount" class="mt-2 text-sm text-primary-800">
+      <div v-if="card" class="rounded-lg bg-indigo-50 p-4">
+        <p class="text-sm font-medium text-indigo-900">{{ card.name }} - {{ card.bank }}</p>
+        <p class="text-xs text-indigo-700">•••• •••• •••• {{ card.lastDigits }}</p>
+        <p v-if="suggestedAmount" class="mt-2 text-sm text-indigo-800">
           Monto sugerido: <span class="font-bold">{{ formatCurrency(suggestedAmount) }}</span>
         </p>
       </div>
@@ -129,7 +124,7 @@ const formatCurrency = (amount: number) => {
             step="0.01"
             min="0"
             required
-            class="block w-full rounded-lg border border-gray-300 py-2 pl-8 pr-3 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            class="block w-full rounded-lg border border-gray-300 py-2 pl-8 pr-3 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             placeholder="0.00"
           />
         </div>
@@ -143,7 +138,7 @@ const formatCurrency = (amount: number) => {
           v-model="form.date"
           type="date"
           required
-          class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+          class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
         />
       </div>
 
@@ -153,7 +148,7 @@ const formatCurrency = (amount: number) => {
         <select
           v-model.number="form.categoryId"
           required
-          class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+          class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
         >
           <option :value="null" disabled>Selecciona una categoría</option>
           <option v-for="cat in paymentCategories" :key="cat.id" :value="cat.id">

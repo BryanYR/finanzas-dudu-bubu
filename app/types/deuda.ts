@@ -28,7 +28,7 @@ export interface DebtPayment {
   date: string
   paymentNumber: number
   notes?: string
-  debtId: number
+  debtId?: number
 }
 
 export interface DebtInstallment {

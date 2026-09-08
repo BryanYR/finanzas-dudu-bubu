@@ -1,28 +1,15 @@
 <script setup lang="ts">
+import type { CardPayment } from '#types/tarjeta'
 import CheckCircleIcon from '@components/icons/common/CheckCircleIcon.vue'
 import CardIcon from '@components/icons/tarjetas/CardIcon.vue'
 
-interface Payment {
-  id: number
-  amount: number
-  date: string
-  description: string
-  category: {
-    id: number
-    name: string
-    color: string | null
-  } | null
-}
-
-interface Props {
+const props = defineProps<{
   show: boolean
   cardId: number | null
   cardName: string
-}
-
-const props = defineProps<Props>()
+}>()
 const emit = defineEmits<{
-  (e: 'update:show', value: boolean): void
+  'update:show': [value: boolean]
 }>()
 
 const { formatDate, formatCurrency } = useDateFormatter()
@@ -32,7 +19,7 @@ const { $dayjs } = useNuxtApp()
 const dayjs = $dayjs as typeof import('dayjs')
 
 // Data
-const payments = ref<Payment[]>([])
+const payments = ref<CardPayment[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
 
@@ -81,7 +68,7 @@ const totalPaid = computed(() => {
   >
     <div v-if="loading" class="flex items-center justify-center py-8">
       <div
-        class="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent"
+        class="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"
       ></div>
     </div>
 
@@ -91,7 +78,7 @@ const totalPaid = computed(() => {
 
     <div v-else>
       <!-- Summary -->
-      <div class="mb-6 rounded-xl bg-primary-600 p-6 text-white">
+      <div class="mb-6 rounded-lg bg-gradient-to-r from-green-500 to-emerald-600 p-6 text-white">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm opacity-90">Total Pagado</p>

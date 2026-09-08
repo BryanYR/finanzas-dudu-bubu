@@ -117,6 +117,23 @@ export const ExpenseSchema = z.object({
     .positive('La categoria es requerida'),
   paymentMethod: z.enum(['cash', 'debit', 'credit']).optional().default('cash'),
   creditCardId: z.number().int().positive().optional().nullable(),
+  // Solo aplican cuando paymentMethod === 'credit' y el gasto se paga en cuotas
+  installments: z
+    .number('El número de cuotas debe ser un número')
+    .int()
+    .positive('El número de cuotas debe ser positivo')
+    .optional()
+    .nullable(),
+  installmentAmount: z
+    .number('La cuota debe ser un número')
+    .positive('La cuota debe ser positiva')
+    .optional()
+    .nullable(),
+  totalWithInterest: z
+    .number('El total con interés debe ser un número')
+    .positive('El total con interés debe ser positivo')
+    .optional()
+    .nullable(),
 })
 
 export const ExpenseUpdateSchema = ExpenseSchema.partial()
@@ -144,7 +161,11 @@ export const CreditCardSchema = z.object({
   interestRate: z
     .number('La tasa debe ser un número')
     .min(0, 'La tasa no puede ser negativa')
-    .max(100, 'La tasa no puede superar el 100%'),
+    .max(100, 'La tasa no puede superar el 100%')
+    .optional()
+    .nullable(),
+  // {"2": 15.806, "3": 19.156, ...} - % interés total sobre capital por n cuotas
+  installmentFees: z.record(z.string(), z.number()).optional().nullable(),
   carriedBalance: z
     .number('El saldo previo debe ser un número')
     .min(0, 'El saldo previo no puede ser negativo')

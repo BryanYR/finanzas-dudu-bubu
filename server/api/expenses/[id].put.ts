@@ -1,11 +1,10 @@
 import { prisma } from '@server/utils/db'
-import { getUserFromSession } from '@server/utils/auth'
+import { requireUser } from '@server/utils/auth'
 import { validateBody, ExpenseUpdateSchema } from '@server/utils/validation'
 import { serializeDecimals } from '@server/utils/serialize'
 
 export default defineEventHandler(async (event) => {
-  const user = await getUserFromSession(event)
-  if (!user) throw createError({ statusCode: 401 })
+  const user = await requireUser(event)
 
   const id = Number(event.context.params?.id)
   const body = validateBody(ExpenseUpdateSchema, await readBody(event))
@@ -50,11 +49,21 @@ export default defineEventHandler(async (event) => {
     updateData.notes = body.notes || null
   }
 
-  // Handle credit card - only set if payment method is credit
+  // Handle credit card - only set if payment method is credit. Cuando se paga en
+  // cuotas también se guardan installments/installmentAmount/totalWithInterest
+  // (calculados en el cliente a partir de installmentFees de la tarjeta).
   if (body.paymentMethod === 'credit' && body.creditCardId) {
     updateData.creditCardId = body.creditCardId
+    updateData.installments = body.installments && body.installments > 1 ? body.installments : null
+    updateData.installmentAmount =
+      body.installmentAmount && body.installmentAmount > 0 ? body.installmentAmount : null
+    updateData.totalWithInterest =
+      body.totalWithInterest && body.totalWithInterest > 0 ? body.totalWithInterest : null
   } else if (body.paymentMethod !== 'credit') {
     updateData.creditCardId = null
+    updateData.installments = null
+    updateData.installmentAmount = null
+    updateData.totalWithInterest = null
   }
 
   const updated = await prisma.expense.update({

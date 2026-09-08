@@ -1,16 +1,5 @@
 <script setup lang="ts">
-interface CreditCard {
-  id?: number
-  name: string
-  bank: string
-  lastDigits: string
-  creditLimit: number
-  billingDay: number
-  paymentDay: number
-  interestRate?: number
-  carriedBalance?: number
-  isActive: boolean
-}
+import type { CreditCard } from '#types/tarjeta'
 
 const props = defineProps<{
   card?: CreditCard | null
@@ -19,11 +8,15 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:show': [value: boolean]
-  save: [card: CreditCard]
+  save: []
 }>()
 
 const saving = ref(false)
+const showFeeTable = ref(false)
 const $authFetch = useAuthFetch()
+
+// Cuota counts offered in the fee table
+const CUOTA_OPTIONS = [2, 3, 4, 5, 6, 9, 12, 18, 24]
 
 const form = reactive({
   name: '',
@@ -32,10 +25,15 @@ const form = reactive({
   creditLimit: 0,
   billingDay: 1,
   paymentDay: 1,
-  interestRate: 0,
+  interestRate: '' as string | number,
   carriedBalance: 0,
   isActive: true,
 })
+
+// Fee table: cuota count → total interest % over principal
+const feeTable = reactive<Record<number, string>>(
+  Object.fromEntries(CUOTA_OPTIONS.map((n) => [n, '']))
+)
 
 const resetForm = () => {
   form.name = ''
@@ -44,54 +42,65 @@ const resetForm = () => {
   form.creditLimit = 0
   form.billingDay = 1
   form.paymentDay = 1
-  form.interestRate = 0
+  form.interestRate = ''
   form.carriedBalance = 0
   form.isActive = true
+  showFeeTable.value = false
+  CUOTA_OPTIONS.forEach((n) => {
+    feeTable[n] = ''
+  })
 }
 
-// Watch card prop to populate form
+const populateFromCard = (card: CreditCard) => {
+  form.name = card.name
+  form.bank = card.bank
+  form.lastDigits = card.lastDigits
+  form.creditLimit = card.creditLimit
+  form.billingDay = card.billingDay
+  form.paymentDay = card.paymentDay
+  form.interestRate = card.interestRate ?? ''
+  form.carriedBalance = card.carriedBalance || 0
+  form.isActive = card.isActive
+  // Populate fee table
+  CUOTA_OPTIONS.forEach((n) => {
+    const fee = card.installmentFees?.[String(n)]
+    feeTable[n] = fee == null ? '' : String(fee)
+  })
+  showFeeTable.value = Object.values(card.installmentFees ?? {}).some((v) => v > 0)
+}
+
 watch(
   () => props.card,
-  (newCard) => {
-    if (newCard) {
-      form.name = newCard.name
-      form.bank = newCard.bank
-      form.lastDigits = newCard.lastDigits
-      form.creditLimit = newCard.creditLimit
-      form.billingDay = newCard.billingDay
-      form.paymentDay = newCard.paymentDay
-      form.interestRate = newCard.interestRate || 0
-      form.carriedBalance = newCard.carriedBalance || 0
-      form.isActive = newCard.isActive
-    } else {
-      resetForm()
-    }
-  },
+  (c) => (c ? populateFromCard(c) : resetForm()),
   { immediate: true }
 )
-
-// Watch show prop
 watch(
   () => props.show,
-  (isShowing) => {
-    if (isShowing && !props.card) {
-      resetForm()
-    } else if (isShowing && props.card) {
-      form.name = props.card.name
-      form.bank = props.card.bank
-      form.lastDigits = props.card.lastDigits
-      form.creditLimit = props.card.creditLimit
-      form.billingDay = props.card.billingDay
-      form.paymentDay = props.card.paymentDay
-      form.interestRate = props.card.interestRate || 0
-      form.carriedBalance = props.card.carriedBalance || 0
-      form.isActive = props.card.isActive
-    }
+  (open) => {
+    if (open) props.card ? populateFromCard(props.card) : resetForm()
   }
+)
+
+// Preview: for each cuota with a fee, show what S/. 1000 would cost
+const feePreview = computed(() =>
+  CUOTA_OPTIONS.map((n) => {
+    const pct = Number.parseFloat(String(feeTable[n]))
+    if (!pct || pct <= 0) return null
+    const totalInterest = (1000 * pct) / 100
+    const monthly = (1000 + totalInterest) / n
+    return { n, monthly, totalInterest }
+  })
 )
 
 const handleSave = async () => {
   saving.value = true
+
+  // Build installmentFees — only include rows with a valid positive value
+  const installmentFees: Record<string, number> = {}
+  CUOTA_OPTIONS.forEach((n) => {
+    const v = Number.parseFloat(String(feeTable[n]))
+    if (v > 0) installmentFees[String(n)] = v
+  })
 
   const dataToSend = {
     name: form.name,
@@ -100,33 +109,30 @@ const handleSave = async () => {
     creditLimit: Number(form.creditLimit),
     billingDay: Number(form.billingDay),
     paymentDay: Number(form.paymentDay),
-    interestRate: form.interestRate ? Number(form.interestRate) : undefined,
+    interestRate: form.interestRate === '' ? undefined : Number(form.interestRate),
+    installmentFees: Object.keys(installmentFees).length > 0 ? installmentFees : null,
     carriedBalance: Number(form.carriedBalance) || 0,
     isActive: form.isActive,
   }
 
   try {
     if (props.card?.id) {
-      await $authFetch(`/api/credit-cards/${props.card.id}`, {
-        method: 'PUT',
-        body: dataToSend,
-      })
+      await $authFetch(`/api/credit-cards/${props.card.id}`, { method: 'PUT', body: dataToSend })
     } else {
-      await $authFetch('/api/credit-cards', {
-        method: 'POST',
-        body: dataToSend,
-      })
+      await $authFetch('/api/credit-cards', { method: 'POST', body: dataToSend })
     }
-    emit('save', dataToSend)
+    emit('save')
     emit('update:show', false)
     setTimeout(() => resetForm(), 300)
-  } catch (err) {
-    console.error('Error al guardar tarjeta:', err)
-    alert('Error al guardar la tarjeta')
+  } catch {
+    useToast().error('Error al guardar la tarjeta')
   } finally {
     saving.value = false
   }
 }
+
+const inputClass =
+  'mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 shadow-sm outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100'
 </script>
 
 <template>
@@ -137,137 +143,224 @@ const handleSave = async () => {
     size="lg"
   >
     <form @submit.prevent="handleSave" class="space-y-4">
+      <!-- Nombre + Banco -->
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <!-- Nombre -->
         <div>
-          <label for="name" class="block text-sm font-medium text-gray-700">
-            Nombre <span class="text-red-500">*</span>
-          </label>
+          <label for="cc-name" class="block text-sm font-medium text-gray-700"
+            >Nombre <span class="text-red-500">*</span></label
+          >
           <input
-            id="name"
+            id="cc-name"
             v-model="form.name"
             type="text"
             required
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            placeholder="Ej: Visa Gold"
+            :class="inputClass"
+            placeholder="Ej: CMR Falabella"
           />
         </div>
-
-        <!-- Banco -->
         <div>
-          <label for="bank" class="block text-sm font-medium text-gray-700">
-            Banco <span class="text-red-500">*</span>
-          </label>
+          <label for="cc-bank" class="block text-sm font-medium text-gray-700"
+            >Banco <span class="text-red-500">*</span></label
+          >
           <input
-            id="bank"
+            id="cc-bank"
             v-model="form.bank"
             type="text"
             required
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            placeholder="Ej: Banco Pichincha"
+            :class="inputClass"
+            placeholder="Ej: Banco Falabella"
           />
         </div>
       </div>
 
+      <!-- Últimos dígitos + Límite -->
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <!-- Últimos 4 dígitos -->
         <div>
-          <label for="lastDigits" class="block text-sm font-medium text-gray-700">
-            Últimos 4 dígitos <span class="text-red-500">*</span>
-          </label>
+          <label for="cc-digits" class="block text-sm font-medium text-gray-700"
+            >Últimos 4 dígitos <span class="text-red-500">*</span></label
+          >
           <input
-            id="lastDigits"
+            id="cc-digits"
             v-model="form.lastDigits"
             type="text"
             required
             maxlength="4"
             pattern="[0-9]{4}"
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            :class="inputClass"
             placeholder="1234"
           />
         </div>
-
-        <!-- Límite de crédito -->
         <div>
-          <label for="creditLimit" class="block text-sm font-medium text-gray-700">
-            Límite de crédito <span class="text-red-500">*</span>
-          </label>
+          <label for="cc-limit" class="block text-sm font-medium text-gray-700"
+            >Límite de crédito <span class="text-red-500">*</span></label
+          >
           <input
-            id="creditLimit"
+            id="cc-limit"
             v-model="form.creditLimit"
             type="number"
             required
             min="0"
             step="0.01"
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            :class="inputClass"
             placeholder="0.00"
           />
         </div>
       </div>
 
+      <!-- Días de corte / pago / TEA -->
       <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <!-- Día de corte -->
         <div>
-          <label for="billingDay" class="block text-sm font-medium text-gray-700">
-            Día de corte <span class="text-red-500">*</span>
-          </label>
+          <label for="cc-billing-day" class="block text-sm font-medium text-gray-700"
+            >Día de corte <span class="text-red-500">*</span></label
+          >
           <input
-            id="billingDay"
+            id="cc-billing-day"
             v-model="form.billingDay"
             type="number"
             required
             min="1"
             max="31"
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            :class="inputClass"
           />
         </div>
-
-        <!-- Día de pago -->
         <div>
-          <label for="paymentDay" class="block text-sm font-medium text-gray-700">
-            Día de pago <span class="text-red-500">*</span>
-          </label>
+          <label for="cc-payment-day" class="block text-sm font-medium text-gray-700"
+            >Día de pago <span class="text-red-500">*</span></label
+          >
           <input
-            id="paymentDay"
+            id="cc-payment-day"
             v-model="form.paymentDay"
             type="number"
             required
             min="1"
             max="31"
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            :class="inputClass"
           />
         </div>
-
-        <!-- Tasa de interés -->
         <div>
-          <label for="interestRate" class="block text-sm font-medium text-gray-700">
-            Tasa de interés (%)
-          </label>
+          <label for="cc-tea" class="block text-sm font-medium text-gray-700">TEA (%)</label>
           <input
-            id="interestRate"
+            id="cc-tea"
             v-model="form.interestRate"
             type="number"
             min="0"
-            max="100"
+            max="1000"
             step="0.01"
-            class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            placeholder="0.00"
+            :class="inputClass"
+            placeholder="Ej: 120"
           />
+          <p class="mt-1 text-[10px] text-gray-400">
+            Tasa Efectiva Anual — solo si no usas tabla de cuotas
+          </p>
+        </div>
+      </div>
+
+      <!-- Tabla de costos por cuotas (opcional) -->
+      <div class="rounded-xl border border-gray-200 bg-gray-50">
+        <button
+          type="button"
+          class="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-gray-700"
+          @click="showFeeTable = !showFeeTable"
+        >
+          <div class="flex items-center gap-2">
+            <svg
+              class="h-4 w-4 text-indigo-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"
+              />
+            </svg>
+            <span>Tabla de costos por cuotas</span>
+            <span
+              class="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-600"
+              >Recomendado</span
+            >
+          </div>
+          <svg
+            class="h-4 w-4 text-gray-400 transition-transform"
+            :class="showFeeTable ? 'rotate-180' : ''"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        </button>
+
+        <div v-if="showFeeTable" class="border-t border-gray-200 px-4 pb-4 pt-3">
+          <p class="mb-3 text-xs text-gray-500">
+            Ingresa el <strong>% de interés total sobre el capital</strong> para cada número de
+            cuotas. Cópialo directamente de la calculadora de tu banco.<br />
+            Ejemplo: si 6 cuotas sobre S/. 1,000 suman S/. 1,295.95 → ingresa
+            <strong>29.595</strong>
+          </p>
+
+          <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <div
+              v-for="(preview, i) in feePreview"
+              :key="CUOTA_OPTIONS[i]"
+              class="rounded-xl border border-gray-200 bg-white p-3"
+            >
+              <div class="flex items-center gap-2">
+                <span
+                  class="shrink-0 rounded-lg bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-600"
+                >
+                  {{ CUOTA_OPTIONS[i] }} cuotas
+                </span>
+                <div class="relative flex-1">
+                  <input
+                    v-model="feeTable[CUOTA_OPTIONS[i]]"
+                    type="number"
+                    min="0"
+                    max="500"
+                    step="0.001"
+                    placeholder="0.000"
+                    class="w-full rounded-lg border border-gray-200 py-1.5 pl-3 pr-7 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  />
+                  <span class="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400"
+                    >%</span
+                  >
+                </div>
+              </div>
+
+              <!-- Preview para S/. 1000 -->
+              <div
+                v-if="preview"
+                class="mt-2 rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs text-indigo-700"
+              >
+                Por c/S./ 1,000:
+                <span class="font-semibold">S/. {{ preview.monthly.toFixed(2) }}/mes</span>
+                · interés
+                <span class="font-semibold">S/. {{ preview.totalInterest.toFixed(2) }}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       <!-- Saldo previo / cuotas en curso -->
       <div>
-        <label for="carriedBalance" class="block text-sm font-medium text-gray-700">
+        <label for="cc-carried-balance" class="block text-sm font-medium text-gray-700">
           Saldo previo / cuotas en curso
         </label>
         <input
-          id="carriedBalance"
+          id="cc-carried-balance"
           v-model="form.carriedBalance"
           type="number"
           min="0"
           step="0.01"
-          class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          :class="inputClass"
           placeholder="0.00"
         />
         <p class="mt-1 text-xs text-gray-500">
@@ -277,23 +370,44 @@ const handleSave = async () => {
       </div>
 
       <!-- Estado activo -->
-      <div class="flex items-center">
+      <label class="flex items-center gap-2 text-sm text-gray-700">
         <input
-          id="isActive"
           v-model="form.isActive"
           type="checkbox"
-          class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-2 focus:ring-primary-500"
+          class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
         />
-        <label for="isActive" class="ml-2 block text-sm text-gray-700"> Tarjeta activa </label>
-      </div>
+        Tarjeta activa
+      </label>
     </form>
 
     <template #footer>
       <div class="flex justify-end gap-3">
-        <UiButton @click="emit('update:show', false)" variant="outline"> Cancelar </UiButton>
-        <UiButton @click="handleSave" :loading="saving" variant="primary">
+        <button
+          type="button"
+          @click="emit('update:show', false)"
+          class="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          @click="handleSave"
+          :disabled="saving"
+          class="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-60"
+        >
+          <svg v-if="saving" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle
+              class="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              stroke-width="4"
+            />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+          </svg>
           {{ card ? 'Actualizar' : 'Crear' }}
-        </UiButton>
+        </button>
       </div>
     </template>
   </UiModal>

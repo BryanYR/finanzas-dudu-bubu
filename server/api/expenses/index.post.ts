@@ -1,11 +1,10 @@
 import { prisma } from '@server/utils/db'
-import { getUserFromSession } from '@server/utils/auth'
+import { requireUser } from '@server/utils/auth'
 import { validateBody, ExpenseSchema } from '@server/utils/validation'
 import { serializeDecimals } from '@server/utils/serialize'
 
 export default defineEventHandler(async (event) => {
-  const user = await getUserFromSession(event)
-  if (!user) throw createError({ statusCode: 401 })
+  const user = await requireUser(event)
 
   const body = validateBody(ExpenseSchema, await readBody(event))
 
@@ -40,6 +39,19 @@ export default defineEventHandler(async (event) => {
       categoryId: body.categoryId,
       paymentMethod: body.paymentMethod,
       creditCardId: body.paymentMethod === 'credit' ? (body.creditCardId ?? undefined) : undefined,
+      // Cuotas: solo aplican a gastos pagados con tarjeta de crédito
+      installments:
+        body.paymentMethod === 'credit' && body.installments && body.installments > 1
+          ? body.installments
+          : null,
+      installmentAmount:
+        body.paymentMethod === 'credit' && body.installmentAmount && body.installmentAmount > 0
+          ? body.installmentAmount
+          : null,
+      totalWithInterest:
+        body.paymentMethod === 'credit' && body.totalWithInterest && body.totalWithInterest > 0
+          ? body.totalWithInterest
+          : null,
       userId: user.id,
     },
   })

@@ -12,6 +12,24 @@ export interface Expense {
   notes?: string
   categoryId: number
   creditCardId?: number
+  installments?: number
+  installmentAmount?: number
+  totalWithInterest?: number
   category: Category
   creditCard?: CreditCard
+}
+
+export interface ExpenseInput {
+  amount: number
+  description: string
+  date: string
+  isRecurring: boolean
+  frequency?: string
+  categoryId: number
+  paymentMethod: string
+  creditCardId?: number
+  installments?: number
+  installmentAmount?: number
+  totalWithInterest?: number
+  notes?: string
 }
