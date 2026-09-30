@@ -36,7 +36,7 @@ const handleComplete = async (id: number) => {
     await refresh()
   } catch (err) {
     console.error('Error al marcar la proyección como completada:', err)
-    alert('Error al marcar la proyección como completada')
+    useToast().error(getErrorMessage(err, 'Error al marcar la proyección como completada'))
   } finally {
     completingId.value = null
   }
@@ -55,7 +55,7 @@ const handleDelete = async (id: number) => {
     await refresh()
   } catch (err) {
     console.error('Error al eliminar la proyección:', err)
-    alert('Error al eliminar la proyección')
+    useToast().error(getErrorMessage(err, 'Error al eliminar la proyección'))
   } finally {
     deletingId.value = null
   }

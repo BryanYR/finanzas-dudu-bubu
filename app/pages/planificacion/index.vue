@@ -4,6 +4,7 @@ import type { PaymentPlan, PaymentSuggestion, CashFlowDay } from '#types/planifi
 definePageMeta({ layout: 'default' })
 
 const { formatDate, formatCurrency } = useDateFormatter()
+const dayjsLib = useNuxtApp().$dayjs as typeof import('dayjs')
 const {
   data: paymentPlan,
   pending,
@@ -82,8 +83,35 @@ const typeBadge: Record<string, string> = {
 
 // ── Computed ───────────────────────────────────────────────────────────────────
 
-const status = computed(() => paymentPlan.value?.summary.cashFlowStatus ?? 'healthy')
-const cfg = computed(() => statusConfig[status.value])
+const currentCycle = computed(() => paymentPlan.value?.cycles.current)
+const nextCycle = computed(() => paymentPlan.value?.cycles.next)
+const cfg = computed(() => statusConfig[currentCycle.value?.status ?? 'healthy'])
+const nextCfg = computed(() => statusConfig[nextCycle.value?.status ?? 'healthy'])
+
+// endDate del ciclo es el día del siguiente sueldo (exclusivo): el último día cubierto es el anterior
+const lastDayOf = (cycleEnd: string) =>
+  formatDate(dayjsLib(cycleEnd).subtract(1, 'day').format('YYYY-MM-DD'), 'DD/MM')
+
+const cycleGroups = computed(() => {
+  const plan = paymentPlan.value
+  if (!plan) return []
+  return [
+    {
+      key: 'current',
+      title: `Con lo que tienes ahora`,
+      subtitle: `Vence antes de tu sueldo del ${formatDate(plan.cycles.current.endDate, 'DD/MM')}`,
+      items: plan.suggestions.filter((s) => s.cycle === 'current'),
+      emptyText: 'Todo lo de este ciclo ya está pagado.',
+    },
+    {
+      key: 'next',
+      title: `Con el sueldo del ${formatDate(plan.cycles.next.startDate, 'DD/MM')}`,
+      subtitle: `Vence entre el ${formatDate(plan.cycles.next.startDate, 'DD/MM')} y el ${lastDayOf(plan.cycles.next.endDate)}`,
+      items: plan.suggestions.filter((s) => s.cycle === 'next'),
+      emptyText: 'No hay pagos registrados para el próximo ciclo.',
+    },
+  ]
+})
 
 const urgentSuggestions = computed(
   () => paymentPlan.value?.suggestions.filter((s) => s.priority === 'urgent') ?? []
@@ -97,15 +125,13 @@ const restSuggestions = computed(
     []
 )
 
-// How much of obligations can be covered by available balance (capped at 100%)
-const coveragePct = computed(() => {
-  const plan = paymentPlan.value
-  if (!plan || plan.summary.totalObligations === 0) return 100
-  return Math.min(100, (plan.summary.availableBalance / plan.summary.totalObligations) * 100)
-})
+// Qué parte de las obligaciones del ciclo cubre lo disponible (0–100%)
+const coverageOf = (available: number, obligations: number) =>
+  obligations === 0 ? 100 : Math.max(0, Math.min(100, (available / obligations) * 100))
 
+// Fechas vienen como YYYY-MM-DD (día calendario): se comparan contra el inicio de hoy
 const daysUntilDue = (dateStr: string) =>
-  Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86_400_000)
+  dayjsLib(dateStr).startOf('day').diff(dayjsLib().startOf('day'), 'day')
 
 const dueDateLabel = (dateStr: string) => {
   const days = daysUntilDue(dateStr)
@@ -163,83 +189,134 @@ const dueDateLabel = (dateStr: string) => {
     </div>
 
     <template v-else-if="paymentPlan">
-      <!-- ── Salud financiera (card principal) ─────────────────────────────── -->
-      <div
-        class="relative overflow-hidden rounded-2xl p-5 text-white shadow-lg"
-        :class="`bg-gradient-to-br ${cfg.gradient}`"
-      >
-        <!-- Decorativos -->
-        <div class="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/10" />
-        <div class="absolute -bottom-6 right-24 h-24 w-24 rounded-full bg-white/10" />
+      <!-- ── Ciclos de sueldo (cards principales) ──────────────────────────── -->
+      <div v-if="currentCycle && nextCycle" class="grid gap-4 md:grid-cols-2">
+        <!-- Ciclo actual -->
+        <div
+          class="relative overflow-hidden rounded-2xl p-5 text-white shadow-lg"
+          :class="`bg-gradient-to-br ${cfg.gradient}`"
+        >
+          <div class="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/10" />
+          <div class="relative">
+            <p class="text-xs font-semibold uppercase tracking-widest text-white/60">
+              Ciclo actual · {{ cfg.label }}
+            </p>
+            <p class="mt-0.5 text-sm text-white/80">
+              Sueldo del {{ formatDate(currentCycle.startDate, 'DD/MM') }} → hasta el
+              {{ lastDayOf(currentCycle.endDate) }}
+            </p>
+            <p class="mt-3 text-xs text-white/60">Te queda tras pagar lo del ciclo</p>
+            <p
+              class="text-3xl font-bold tracking-tight"
+              :class="currentCycle.result < 0 ? 'text-red-200' : 'text-white'"
+            >
+              {{ formatCurrency(currentCycle.result) }}
+            </p>
 
-        <div class="relative">
-          <!-- Fila superior -->
-          <div class="flex items-start justify-between gap-4">
+            <div class="mt-4">
+              <div class="mb-1 flex justify-between text-xs text-white/70">
+                <span>Cobertura de pagos del ciclo</span>
+                <span class="font-semibold text-white"
+                  >{{
+                    coverageOf(currentCycle.available, currentCycle.obligationsTotal).toFixed(0)
+                  }}%</span
+                >
+              </div>
+              <div class="h-2.5 overflow-hidden rounded-full bg-white/20">
+                <div
+                  class="h-full rounded-full transition-all duration-700"
+                  :class="cfg.barColor"
+                  :style="{
+                    width: coverageOf(currentCycle.available, currentCycle.obligationsTotal) + '%',
+                  }"
+                ></div>
+              </div>
+            </div>
+
+            <div class="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+              <div>
+                <p class="text-xs text-white/60">Entró desde el sueldo</p>
+                <p class="font-bold">{{ formatCurrency(currentCycle.income) }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-white/60">Ya pagado / gastado</p>
+                <p class="font-bold">{{ formatCurrency(currentCycle.spent) }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-white/60">Disponible hoy</p>
+                <p class="font-bold">{{ formatCurrency(currentCycle.available) }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-white/60">
+                  Falta pagar ({{ currentCycle.obligationsCount }})
+                </p>
+                <p class="font-bold">{{ formatCurrency(currentCycle.obligationsTotal) }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Próximo ciclo -->
+        <div class="overflow-hidden rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
+          <div class="flex items-start justify-between gap-2">
             <div>
-              <p class="text-xs font-semibold uppercase tracking-widest text-white/60">
-                Estado financiero
+              <p class="text-xs font-semibold uppercase tracking-widest text-gray-400">
+                Próximo ciclo
               </p>
-              <p class="mt-0.5 text-2xl font-bold">{{ cfg.label }}</p>
-              <p class="mt-3 text-xs text-white/60">Saldo proyectado tras pagos</p>
-              <p
-                class="text-3xl font-bold tracking-tight"
-                :class="
-                  (paymentPlan.summary.projectedBalance ?? 0) < 0 ? 'text-red-300' : 'text-white'
-                "
+              <p class="mt-0.5 text-sm text-gray-600">
+                Sueldo del {{ formatDate(nextCycle.startDate, 'DD/MM') }} → hasta el
+                {{ lastDayOf(nextCycle.endDate) }}
+              </p>
+            </div>
+            <span
+              class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+              :class="
+                nextCycle.status === 'deficit'
+                  ? 'bg-red-100 text-red-700'
+                  : nextCycle.status === 'tight'
+                    ? 'bg-amber-100 text-amber-700'
+                    : 'bg-emerald-100 text-emerald-700'
+              "
+            >
+              {{ nextCfg.label }}
+            </span>
+          </div>
+
+          <p class="mt-3 text-xs text-gray-400">Sueldo − pagos del ciclo</p>
+          <p
+            class="text-3xl font-bold tracking-tight"
+            :class="nextCycle.resultWithoutCarry < 0 ? 'text-red-600' : 'text-emerald-600'"
+          >
+            {{ formatCurrency(nextCycle.resultWithoutCarry) }}
+          </p>
+
+          <div class="mt-4 space-y-1.5 text-sm">
+            <div class="flex justify-between">
+              <span class="text-gray-500">Sueldo esperado</span>
+              <span class="font-semibold text-emerald-600">
+                +{{ formatCurrency(nextCycle.income) }}
+              </span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-500">Pagos del ciclo ({{ nextCycle.obligationsCount }})</span>
+              <span class="font-semibold text-red-600">
+                −{{ formatCurrency(nextCycle.obligationsTotal) }}
+              </span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-500">Sobrante del ciclo actual</span>
+              <span class="font-semibold text-gray-700">
+                {{ formatCurrency(nextCycle.carryOver) }}
+              </span>
+            </div>
+            <div class="flex justify-between border-t border-gray-100 pt-1.5">
+              <span class="font-semibold text-gray-700">Resultado con sobrante</span>
+              <span
+                class="font-bold"
+                :class="nextCycle.result < 0 ? 'text-red-600' : 'text-emerald-600'"
               >
-                {{ formatCurrency(paymentPlan.summary.projectedBalance ?? 0) }}
-              </p>
-            </div>
-            <div class="shrink-0 text-right">
-              <p class="text-xs text-white/60">Ingresos disponibles</p>
-              <p class="text-xl font-bold">
-                {{ formatCurrency(paymentPlan.summary.availableBalance) }}
-              </p>
-              <p class="mt-1 text-xs text-white/60">Total obligaciones</p>
-              <p class="text-xl font-bold">
-                {{ formatCurrency(paymentPlan.summary.totalObligations) }}
-              </p>
-            </div>
-          </div>
-
-          <!-- Barra de cobertura -->
-          <div class="mt-4">
-            <div class="mb-1 flex justify-between text-xs text-white/70">
-              <span>Cobertura de obligaciones</span>
-              <span class="font-semibold text-white">{{ coveragePct.toFixed(0) }}%</span>
-            </div>
-            <div class="h-2.5 overflow-hidden rounded-full bg-white/20">
-              <div
-                class="h-full rounded-full transition-all duration-700"
-                :class="cfg.barColor"
-                :style="{ width: coveragePct + '%' }"
-              ></div>
-            </div>
-          </div>
-
-          <!-- Mini stats -->
-          <div class="mt-4 flex flex-wrap gap-5">
-            <div>
-              <p class="text-lg font-bold">{{ paymentPlan.suggestions.length }}</p>
-              <p class="text-xs text-white/60">pagos pendientes</p>
-            </div>
-            <div>
-              <p class="text-lg font-bold">
-                {{ formatCurrency(paymentPlan.summary.currentBalance) }}
-              </p>
-              <p class="text-xs text-white/60">balance actual</p>
-            </div>
-            <div v-if="(paymentPlan.summary.pendingIncome ?? 0) > 0">
-              <p class="text-lg font-bold">
-                {{ formatCurrency(paymentPlan.summary.pendingIncome ?? 0) }}
-              </p>
-              <p class="text-xs text-white/60">ingresos esperados</p>
-            </div>
-            <div>
-              <p class="text-lg font-bold">
-                {{ formatCurrency(paymentPlan.summary.suggestedSafetyBuffer) }}
-              </p>
-              <p class="text-xs text-white/60">colchón sugerido</p>
+                {{ formatCurrency(nextCycle.result) }}
+              </span>
             </div>
           </div>
         </div>
@@ -319,20 +396,21 @@ const dueDateLabel = (dateStr: string) => {
       </div>
 
       <!-- ── Lista de sugerencias de pago ──────────────────────────────────── -->
-      <div>
-        <p class="mb-3 text-sm font-semibold text-gray-700">
-          Plan de pagos
+      <div v-for="group in cycleGroups" :key="group.key">
+        <p class="text-sm font-semibold text-gray-700">
+          {{ group.title }}
           <span class="ml-1 text-xs font-normal text-gray-400">(ordenado por prioridad)</span>
         </p>
+        <p class="mb-3 text-xs text-gray-400">{{ group.subtitle }}</p>
 
         <!-- Empty state -->
         <div
-          v-if="paymentPlan.suggestions.length === 0"
-          class="flex flex-col items-center justify-center rounded-2xl bg-white py-16 text-center shadow-sm ring-1 ring-gray-100"
+          v-if="group.items.length === 0"
+          class="flex items-center gap-3 rounded-2xl bg-white px-4 py-5 shadow-sm ring-1 ring-gray-100"
         >
-          <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50">
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50">
             <svg
-              class="h-8 w-8 text-emerald-400"
+              class="h-5 w-5 text-emerald-400"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -345,14 +423,13 @@ const dueDateLabel = (dateStr: string) => {
               />
             </svg>
           </div>
-          <h3 class="mt-4 text-sm font-semibold text-gray-700">¡Todo al día!</h3>
-          <p class="mt-1 text-sm text-gray-400">No tienes pagos pendientes este mes.</p>
+          <p class="text-sm text-gray-500">{{ group.emptyText }}</p>
         </div>
 
         <!-- Suggestions -->
         <div v-else class="space-y-2.5">
           <div
-            v-for="(s, idx) in paymentPlan.suggestions"
+            v-for="(s, idx) in group.items"
             :key="s.id"
             class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 transition hover:shadow-md"
           >
@@ -478,7 +555,9 @@ const dueDateLabel = (dateStr: string) => {
         class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100"
       >
         <div class="border-b border-gray-50 px-4 py-3">
-          <p class="text-sm font-semibold text-gray-700">Proyección de flujo (próximos 30 días)</p>
+          <p class="text-sm font-semibold text-gray-700">
+            Proyección de flujo (hasta el fin del próximo ciclo)
+          </p>
           <p class="text-xs text-gray-400">
             Saldo estimado día a día considerando pagos e ingresos esperados
           </p>
@@ -512,7 +591,7 @@ const dueDateLabel = (dateStr: string) => {
             <!-- Descripción -->
             <div class="min-w-0 flex-1 text-xs text-gray-600">
               <div v-if="day.type === 'income'" class="font-medium text-emerald-700">
-                Ingreso recurrente esperado
+                Sueldo esperado
               </div>
               <div v-else class="space-y-0.5">
                 <p v-for="p in day.payments" :key="p.id" class="truncate">

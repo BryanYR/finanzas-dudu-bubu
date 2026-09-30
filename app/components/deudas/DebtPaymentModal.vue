@@ -160,7 +160,12 @@ const handleSave = async () => {
     setTimeout(() => resetForm(), 300)
   } catch (err) {
     console.error('Error al registrar pago:', err)
-    useToast().error(isEditMode.value ? 'Error al editar el pago' : 'Error al registrar el pago')
+    useToast().error(
+      getErrorMessage(
+        err,
+        isEditMode.value ? 'Error al editar el pago' : 'Error al registrar el pago'
+      )
+    )
   } finally {
     saving.value = false
   }

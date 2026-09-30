@@ -79,7 +79,7 @@ const handleSubmit = async () => {
     resetForm()
   } catch (err) {
     console.error('Error al guardar:', err)
-    useToast().error('Error al guardar la meta de ahorro')
+    useToast().error(getErrorMessage(err, 'Error al guardar la meta de ahorro'))
   } finally {
     saving.value = false
   }

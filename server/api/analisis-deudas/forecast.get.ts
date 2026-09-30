@@ -1,5 +1,6 @@
 import { prisma } from '@server/utils/db'
 import { requireUser } from '@server/utils/auth'
+import { isMonthSkipped } from '@server/utils/frequency'
 
 const MONTH_NAMES_ES = [
   'Enero',
@@ -79,7 +80,11 @@ export default defineEventHandler(async (event) => {
     thisMonthCashExpenses.reduce((s, e) => s + Number(e.amount), 0)
 
   const monthlyRecurringIncome = recurringIncomes.reduce((s, i) => s + Number(i.amount), 0)
-  const monthlyRecurringExpenses = recurringExpenses.reduce((s, e) => s + Number(e.amount), 0)
+  // Gastos recurrentes del mes, excluyendo los omitidos ese mes (skippedMonths)
+  const recurringExpensesFor = (year: number, month: number) =>
+    recurringExpenses
+      .filter((e) => !isMonthSkipped(e.skippedMonths, year, month))
+      .reduce((s, e) => s + Number(e.amount), 0)
   const monthlyCardEstimate = recentCCExpenses.reduce((s, e) => s + Number(e.amount), 0) / 3
 
   // Group installments by yearMonth key
@@ -132,7 +137,7 @@ export default defineEventHandler(async (event) => {
     const income = monthlyRecurringIncome
     const debtPayments = installmentsByMonth.get(yearMonth) ?? 0
     const cardEst = isCurrentMonth ? 0 : Number(monthlyCardEstimate.toFixed(2))
-    const recurringExp = isCurrentMonth ? 0 : monthlyRecurringExpenses
+    const recurringExp = isCurrentMonth ? 0 : recurringExpensesFor(year, month)
     const totalExpenses = debtPayments + cardEst + recurringExp
     const netBalance = income - totalExpenses
 

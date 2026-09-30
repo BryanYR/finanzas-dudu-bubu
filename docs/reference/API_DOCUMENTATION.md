@@ -131,12 +131,13 @@ indican explícitamente.
 
 ### 💸 Gastos (`/api/expenses`)
 
-| Método | Endpoint            | Descripción                          |
-| ------ | ------------------- | ------------------------------------ |
-| GET    | `/api/expenses`     | Listar gastos (con filtros de fecha) |
-| POST   | `/api/expenses`     | Crear nuevo gasto                    |
-| PUT    | `/api/expenses/:id` | Actualizar gasto                     |
-| DELETE | `/api/expenses/:id` | Eliminar gasto                       |
+| Método | Endpoint                           | Descripción                                    |
+| ------ | ---------------------------------- | ---------------------------------------------- |
+| GET    | `/api/expenses`                    | Listar gastos (con filtros de fecha)           |
+| POST   | `/api/expenses`                    | Crear nuevo gasto                              |
+| PUT    | `/api/expenses/:id`                | Actualizar gasto                               |
+| PUT    | `/api/expenses/:id/skipped-months` | Reemplazar los meses omitidos de un recurrente |
+| DELETE | `/api/expenses/:id`                | Eliminar gasto                                 |
 
 **Query params para GET:** `from`/`to` (igual que ingresos). Incluye `category` y `creditCard`; ordenado por `date desc`.
 
@@ -167,6 +168,17 @@ indican explícitamente.
 - Si se envía `creditCardId` (truthy), se revalida pertenencia al usuario (`404 Tarjeta no encontrada`).
 - Si `paymentMethod` pasa a ser distinto de `"credit"`, `creditCardId` se limpia a `null` automáticamente; si es `"credit"` y se envía `creditCardId`, se actualiza.
 - Si `isRecurring` se envía como `false` sin `frequency`, `frequency` se limpia a `null`.
+- Si `isRecurring` se envía como `false`, `skippedMonths` se limpia a `[]`. Este endpoint no modifica `skippedMonths` en ningún otro caso.
+
+**Body para PUT `/:id/skipped-months`** (`ExpenseSkippedMonthsSchema`):
+
+```json
+{ "skippedMonths": ["2026-10"] }
+```
+
+- Reemplaza la lista completa (se deduplica y ordena); `[]` quita todas las omisiones.
+- Cada mes debe ser `"YYYY-MM"`. Solo para gastos con `isRecurring: true` (`400` si no); `404` si el gasto no es del usuario.
+- Un mes omitido **no se acumula**: el gasto no se cuenta ese mes en `/api/analisis-deudas/forecast`, `/api/budgets/calculate` (vía `countOccurrencesInRange`) ni en `/api/payment-plan/suggestions` (la ocurrencia de ese mes no se cuenta como obligación).
 
 ---
 
@@ -180,7 +192,11 @@ indican explícitamente.
 | DELETE | `/api/credit-cards/:id`                 | Eliminar tarjeta                                     |
 | POST   | `/api/credit-cards/:id/pay`             | Registrar el pago del período de facturación cerrado |
 | GET    | `/api/credit-cards/:id/payment-history` | Historial de pagos registrados de la tarjeta         |
-| GET    | `/api/credit-cards/:id/statement`       | Estado de cuenta / período de facturación actual     |
+| GET    | `/api/credit-cards/:id/statement`       | Monto a pagar, vencimiento y uso de la línea         |
+| GET    | `/api/credit-cards/:id/statements`      | Listar recibos mensuales (`CreditCardStatement`)     |
+| POST   | `/api/credit-cards/:id/statements`      | Cargar un recibo (vencimiento + monto a pagar)       |
+| PUT    | `/api/credit-cards/:id/statements/:sid` | Editar recibo / marcar pagado o pendiente            |
+| DELETE | `/api/credit-cards/:id/statements/:sid` | Eliminar recibo                                      |
 
 **Body para POST/PUT** (`CreditCardSchema` / `CreditCardUpdateSchema` = `.partial()`):
 
@@ -212,7 +228,8 @@ indican explícitamente.
 ```
 
 - `categoryId` debe pertenecer al usuario (`404 Categoría no encontrada` si no).
-- Calcula el **último período de facturación cerrado** de la tarjeta según `billingDay`:
+- **Si la tarjeta tiene un `CreditCardStatement` pendiente**, el pago salda el de `dueDate` más próximo (`isPaid: true`, `paidAt = date`, `paidAmount = amount`) y los gastos a marcar son los del ciclo que vence en ese recibo (`billingWindowForDueDate`). La tarjeta pasa a mostrar el siguiente recibo pendiente.
+- Si no hay recibos cargados, calcula el **último período de facturación cerrado** de la tarjeta según `billingDay`:
   - Si hoy es antes o igual al día de corte del mes actual, el período cerrado corresponde al mes anterior completo (del día siguiente al corte de hace 2 meses hasta el corte del mes pasado).
   - Si ya pasó el corte de este mes, el período cerrado es el que acaba de cerrar (del día siguiente al corte del mes pasado hasta el corte de este mes).
   - _(Este cálculo fue corregido: antes tenía un off-by-one en la rama "antes del corte" que hacía que se contara el mismo período dos veces; ahora resuelve correctamente al período cerrado del mes anterior.)_
@@ -222,7 +239,32 @@ indican explícitamente.
 
 **GET `/api/credit-cards/:id/payment-history`**: devuelve `{ card: { id, name, bank, lastDigits }, payments: [...] }`, donde `payments` son los `Expense` cuya `description` empieza con `'Pago Tarjeta'` para esa tarjeta, con su `category` embebida.
 
-**GET `/api/credit-cards/:id/statement`** (archivo `statement.get.ts`): calcula el período de facturación relevante (el cerrado no pagado si existe, si no el período en curso), la fecha de vencimiento del pago (`paymentDay` respecto al fin del período), y devuelve `{ card, billingPeriod: { startDate, endDate, paymentDueDate }, statement: { totalAmount, transactionCount, creditUsagePercent, availableCredit, paymentDueDate }, expenses }` — solo cuenta gastos con `isPaidOff: false` de ese período.
+**GET `/api/credit-cards/:id/statement`** (archivo `statement.get.ts`, lógica en `creditCardService.resolveCardAmountDue`): devuelve `{ card, billingPeriod: { startDate, endDate, paymentDueDate }, statement: { totalAmount, source, statementId, usedAmount, periodExpensesAmount, carriedBalance, transactionCount, creditUsagePercent, availableCredit, billingEndDate, paymentDueDate }, expenses }`.
+
+- `totalAmount` (monto a pagar) y `paymentDueDate`:
+  - `source: 'statement'`: si hay un `CreditCardStatement` con `isPaid: false`, se usa el de `dueDate` más próximo (aunque ya esté vencido), con su `amount` y `dueDate`. `billingPeriod` es el ciclo que vence en esa fecha.
+  - `source: 'expenses'` (sin recibos cargados): `carriedBalance` + gastos `isPaidOff: false` del período activo (el cerrado no pagado si existe, si no el en curso), con vencimiento `paymentDay` respecto al fin del período.
+- `usedAmount` = `carriedBalance` + gastos no pagados del período activo, **siempre**; es la base de `creditUsagePercent` y `availableCredit` (uso de la línea, no monto del recibo).
+- `expenses` son los gastos no pagados del período activo.
+
+**GET `/api/credit-cards/:id/statements`**: lista los `CreditCardStatement` de la tarjeta ordenados por `dueDate` ascendente.
+
+**POST `/api/credit-cards/:id/statements`** (`CreditCardStatementSchema`):
+
+```json
+{
+  "dueDate": "2026-11-05T17:00:00.000Z",
+  "amount": 2455.85,
+  "notes": "Recibo corte 10/10",
+  "isPaid": false
+}
+```
+
+- `isPaid` opcional (default `false`); si viene `true` sin `paidAt`/`paidAmount`, se asume pago completo hoy.
+
+**PUT `/api/credit-cards/:id/statements/:statementId`** (`CreditCardStatementUpdateSchema`, todos opcionales): `isPaid: true` completa `paidAt`/`paidAmount` si no se envían; `isPaid: false` los limpia. Omitir `isPaid` no cambia el estado de pago.
+
+**DELETE `/api/credit-cards/:id/statements/:statementId`**: `{ success: true }`, `404` si el recibo no es de esa tarjeta/usuario.
 
 ---
 
@@ -404,7 +446,7 @@ indican explícitamente.
 
 No persiste nada (`prisma.budgetProjection.create` no se llama); es puramente una previsualización para que el cliente muestre el desglose antes de confirmar con `POST /api/budgets`. Responde `400` si `endDate <= startDate` (mismo mensaje que `POST /api/budgets`). Calcula, a partir de datos reales del usuario:
 
-- `currentBalance`: saldo actual real de HOY (vía `getCurrentBalance` en `server/utils/cash-flow.ts`, la misma lógica que usa `payment-plan/suggestions.get.ts`) — **no** está acotado al rango `startDate`/`endDate`, es la liquidez disponible en este momento.
+- `currentBalance`: saldo actual real de HOY (vía `getCurrentBalance` en `server/utils/cash-flow.ts`, por mes calendario; `payment-plan/suggestions` ya no la usa, calcula por ciclo de sueldo) — **no** está acotado al rango `startDate`/`endDate`, es la liquidez disponible en este momento.
 - `expectedIncome`: ingresos recurrentes (`Income.isRecurring: true`) proyectados dentro de `[startDate, endDate]` vía `countOccurrencesInRange` (`server/utils/frequency.ts`), más ingresos no recurrentes ya registrados con `date` dentro del rango.
 - `fixedExpenses`: mismo cálculo que `expectedIncome` pero sobre `Expense`.
 - `debtPayments`: suma de `DebtInstallment.amount` con `dueDate` dentro del rango y `status` en `pending`/`overdue`, de deudas no pagadas (`debt.isPaid: false`) del usuario.
@@ -464,17 +506,17 @@ Sin query params. Calcula, para el mes calendario actual (`startOfMonth`–`endO
 | ------ | ------------------------------- | -------------------------------------------------------------------------- |
 | GET    | `/api/payment-plan/suggestions` | Sugerencias priorizadas de qué pagar primero y proyección de flujo de caja |
 
-Sin query params. Combina en un solo análisis:
+Sin query params. Agrupa todo por **ciclo de sueldo** `[sueldo k, sueldo k+1)` en vez de por mes calendario: el sueldo de fin de mes paga lo que vence hasta el siguiente sueldo (ver [planificacion-por-ciclo-de-sueldo.md](../plans/planificacion-por-ciclo-de-sueldo.md)).
 
-- **Saldo actual real**: ingresos recibidos este mes (hasta hoy) menos gastos en efectivo/débito (excluye gastos con `creditCardId` asociado, esos se pagan después vía tarjeta).
-- **Ingresos recurrentes pendientes**: si aún no se recibió ningún ingreso recurrente este mes, se proyecta el total de ingresos recurrentes como pendiente.
-- **Deudas activas**: usa la(s) próxima(s) cuota(s) `pending`/`overdue` de `DebtInstallment` (no un cálculo manual) para determinar monto y fecha de vencimiento por deuda.
-- **Tarjetas de crédito activas**: recalcula, con la misma lógica que `statement.get.ts` (período cerrado no pagado si existe, si no el período en curso), el monto adeudado y la fecha de pago límite de cada tarjeta.
-- **Gastos fijos recurrentes** (`isRecurring: true`): proyecta la próxima fecha de pago según el día del mes del gasto original.
-- Cada ítem recibe una `priority` (`urgent | high | medium | low`) según días restantes hasta el vencimiento (o si ya está `overdue`) y, para deudas, también según tasa de interés (`> 15%` sube a `high`); se ordenan por prioridad y luego por fecha.
-- Genera `warnings` (arreglo de strings) según el estado de flujo de caja (`healthy | tight | deficit`), ingresos pendientes, colchón de seguridad (10% de ingresos) y deudas con interés `> 20%`.
-- Devuelve además una proyección de flujo de caja (`cashFlowProjection`) día a día para los próximos 30 días.
-- Respuesta: `{ summary: { totalIncome, totalObligations, availableBalance, currentBalance, suggestedSafetyBuffer, cashFlowStatus, warnings, pendingIncome, projectedBalance }, suggestions: [...], cashFlowProjection: [...] }`.
+- **Ancla del ciclo**: la plantilla de ingreso recurrente mensual de mayor monto. El ciclo actual empieza el día del último sueldo recibido de esa plantilla (la plantilla misma o un ingreso auto-generado con `notes` "…recurrente #<id>"); si no hay uno en los últimos 40 días, se usa el día teórico. Sin ingresos recurrentes, el ciclo es el mes calendario.
+- **Ciclo actual** (`cycles.current`): `income` = todos los ingresos desde el inicio del ciclo hasta hoy (incluye préstamos recibidos); `spent` = gastos sin `creditCardId` + `DebtPayment` del mismo rango; `available = income − spent`; obligaciones = lo no pagado con vencimiento antes del próximo sueldo (incluye vencidas).
+- **Próximo ciclo** (`cycles.next`): `income` = suma de plantillas mensuales; obligaciones con vencimiento entre el próximo sueldo y el siguiente; `carryOver` = `result` del ciclo actual; `result = carryOver + income − obligationsTotal`; `resultWithoutCarry = income − obligationsTotal`.
+- **Obligaciones**: todas las cuotas `pending`/`overdue` de `DebtInstallment` dentro del horizonte; recibos `CreditCardStatement` no pagados (si una tarjeta no tiene ninguno pendiente, estimación por gastos del periodo activo); ocurrencias de gastos recurrentes **sin tarjeta** posteriores a la fecha de la plantilla, sin meses omitidos (`skippedMonths`) y sin un gasto ya registrado ese mes con la misma descripción (o misma categoría y monto).
+- Cada sugerencia lleva `cycle: 'current' | 'next'`, `isOverdue`, `priority` (`urgent | high | medium | low` por días al vencimiento; deudas `> 15%` suben a `high`) y `suggestedPaymentDate` = vencimiento − 2 días (1 para gastos fijos), nunca antes de hoy ni antes del sueldo que la financia. Orden: ciclo, prioridad, fecha.
+- `status` por ciclo (`healthy | tight | deficit`): `result > colchón` (10% del sueldo esperado) / `≥ 0` / `< 0`.
+- `cashFlowProjection`: día a día desde hoy hasta el fin del próximo ciclo, partiendo de `cycles.current.available`, con el sueldo esperado en el inicio del próximo ciclo.
+- Todas las fechas se devuelven como `YYYY-MM-DD` (día calendario).
+- Respuesta: `{ summary: { totalIncome, totalObligations, availableBalance, currentBalance, suggestedSafetyBuffer, cashFlowStatus, warnings, pendingIncome, projectedBalance, salaryPending }, cycles: { current, next }, suggestions: [...], cashFlowProjection: [...] }`. Los campos de `summary` se refieren al ciclo actual (`pendingIncome` = sueldo esperado del próximo ciclo; `salaryPending` = ese sueldo ya debió llegar pero no está registrado).
 
 ---
 

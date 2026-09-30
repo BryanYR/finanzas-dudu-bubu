@@ -22,6 +22,7 @@ model User {
   incomes           Income[]
   expenses          Expense[]
   creditCards       CreditCard[]
+  cardStatements    CreditCardStatement[]
   savingsGoals      SavingsGoal[]
   debts             Debt[]
   budgetProjections BudgetProjection[]
@@ -72,16 +73,17 @@ model Income {
 
 // ========== GASTOS ==========
 model Expense {
-  id            Int      @id @default(autoincrement())
-  amount        Decimal  @db.Decimal(12, 2)
-  description   String
-  date          DateTime @default(now())
-  isRecurring   Boolean  @default(false) // Si es fijo/recurrente
-  frequency     String? // "monthly" | "biweekly" | "weekly" | "annual" | null (para variado)
-  categoryId    Int
-  userId        Int
-  paymentMethod String   @default("cash") // "cash" | "debit" | "credit"
-  creditCardId  Int? // Opcional: si se pagó con tarjeta de crédito
+  id                Int      @id @default(autoincrement())
+  amount            Decimal  @db.Decimal(12, 2)
+  description       String
+  date              DateTime @default(now())
+  isRecurring       Boolean  @default(false) // Si es fijo/recurrente
+  frequency         String? // "monthly" | "biweekly" | "weekly" | "annual" | null (para variado)
+  skippedMonths     String[] @default([]) // Meses "YYYY-MM" en que este recurrente no aplica (omitido por acuerdo, no se acumula)
+  categoryId        Int
+  userId            Int
+  paymentMethod     String   @default("cash") // "cash" | "debit" | "credit"
+  creditCardId      Int? // Opcional: si se pagó con tarjeta de crédito
   isPaidOff         Boolean  @default(false) // Para gastos con tarjeta: marca si el estado de cuenta ya fue pagado
   installments      Int? // Número de cuotas (solo para tarjeta de crédito, null = pago único)
   installmentAmount Decimal? @db.Decimal(12, 2) // Cuota mensual real calculada (capital + interés / n)
@@ -116,13 +118,39 @@ model CreditCard {
   isActive        Boolean @default(true)
   userId          Int
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expenses Expense[]
+  user       User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expenses   Expense[]
+  statements CreditCardStatement[] // Recibos mensuales (monto a pagar por vencimiento)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId, isActive])
+}
+
+// ========== RECIBOS MENSUALES DE TARJETA ==========
+// Monto a pagar de cada recibo (del estado de cuenta o calculado a mano). Si la tarjeta
+// tiene recibos pendientes, el más próximo es lo que se muestra "a pagar"; si no, se
+// cae al cálculo por Expense + carriedBalance (ver creditCardService.resolveCardAmountDue).
+model CreditCardStatement {
+  id           Int       @id @default(autoincrement())
+  dueDate      DateTime // Fecha de vencimiento del recibo
+  amount       Decimal   @db.Decimal(12, 2) // Monto total a pagar del recibo
+  isPaid       Boolean   @default(false)
+  paidAt       DateTime?
+  paidAmount   Decimal?  @db.Decimal(12, 2) // Lo que realmente se pagó
+  notes        String?
+  creditCardId Int
+  userId       Int
+
+  creditCard CreditCard @relation(fields: [creditCardId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([creditCardId, isPaid, dueDate])
+  @@index([userId])
 }
 
 // ========== METAS DE AHORRO ==========

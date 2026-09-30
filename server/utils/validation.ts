@@ -138,6 +138,14 @@ export const ExpenseSchema = z.object({
 
 export const ExpenseUpdateSchema = ExpenseSchema.partial()
 
+// Meses ("YYYY-MM") en que un gasto recurrente no aplica. Se reemplaza la lista
+// completa en cada llamada; lista vacía = el gasto aplica todos los meses.
+export const ExpenseSkippedMonthsSchema = z.object({
+  skippedMonths: z
+    .array(z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'El mes debe tener formato YYYY-MM'))
+    .max(120, 'Demasiados meses omitidos'),
+})
+
 // ─── Credit Cards ──────────────────────────────────────────────────────────
 
 export const CreditCardSchema = z.object({
@@ -185,6 +193,27 @@ export const CreditCardPaymentSchema = z.object({
     .int()
     .positive('La categoria es requerida'),
 })
+
+export const CreditCardStatementSchema = z.object({
+  dueDate: z.iso.datetime({ offset: true, message: 'La fecha de vencimiento es inválida' }),
+  amount: z
+    .number('El monto debe ser un número')
+    .positive('El monto debe ser positivo')
+    .max(999_999_999, 'El monto es demasiado grande'),
+  isPaid: z.boolean().optional().default(false),
+  paidAt: optionalDateNullable,
+  paidAmount: z
+    .number('El monto pagado debe ser un número')
+    .min(0, 'El monto pagado no puede ser negativo')
+    .optional()
+    .nullable(),
+  notes: z.string().trim().max(500, 'Las notas son demasiado largas').optional().nullable(),
+})
+
+// Sin .partial() sobre el default de isPaid: un PUT que no manda isPaid no debe despagar el recibo
+export const CreditCardStatementUpdateSchema = CreditCardStatementSchema.extend({
+  isPaid: z.boolean().optional(),
+}).partial()
 
 // ─── Savings ───────────────────────────────────────────────────────────────
 

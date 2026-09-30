@@ -65,7 +65,7 @@ const handleSubmit = async () => {
     resetForm()
   } catch (err) {
     console.error('Error al guardar:', err)
-    useToast().error('Error al registrar la contribución')
+    useToast().error(getErrorMessage(err, 'Error al registrar la contribución'))
   } finally {
     saving.value = false
   }

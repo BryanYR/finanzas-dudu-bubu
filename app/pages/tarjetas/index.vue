@@ -62,6 +62,8 @@ const deleting = ref(false)
 const editingCard = ref<CreditCard | null>(null)
 const cardToPay = ref<{ card: CreditCard; suggestedAmount: number } | null>(null)
 const cardForHistory = ref<{ id: number; name: string } | null>(null)
+const showStatementsModal = ref(false)
+const cardForStatements = ref<CreditCard | null>(null)
 const filterActive = ref<'all' | 'active' | 'inactive'>('all')
 const confirm = useConfirm()
 
@@ -123,6 +125,10 @@ const openPaymentModal = (card: CreditCard, amount: number) => {
   cardToPay.value = { card, suggestedAmount: amount }
   showPaymentModal.value = true
 }
+const openStatementsModal = (card: CreditCard) => {
+  cardForStatements.value = card
+  showStatementsModal.value = true
+}
 const openPaymentHistoryModal = (card: CreditCard) => {
   cardForHistory.value = { id: card.id, name: card.name }
   showPaymentHistoryModal.value = true
@@ -150,8 +156,8 @@ const deleteCard = async (card: CreditCard) => {
     await $authFetch(`/api/credit-cards/${card.id}`, { method: 'DELETE' })
     await refresh()
     await loadStatements()
-  } catch {
-    toast.error('Error al eliminar la tarjeta')
+  } catch (err) {
+    toast.error(getErrorMessage(err, 'Error al eliminar la tarjeta'))
   } finally {
     deleting.value = false
   }
@@ -160,6 +166,16 @@ const deleteCard = async (card: CreditCard) => {
 const daysUntilDue = (statement: StatementWithPeriod) => {
   const due = statement.billingPeriod?.paymentDueDate ?? statement.paymentDueDate
   return due ? dayjs(due).diff(dayjs(), 'day') : null
+}
+
+// "Pago del mes" si vence este mes, "Próximo pago" si es de un mes siguiente (el del mes
+// actual ya se pagó o aún no se factura), "Vencido" si la fecha ya pasó sin pagarse
+const amountDueLabel = (statement: StatementWithPeriod) => {
+  const due = statement.billingPeriod?.paymentDueDate ?? statement.paymentDueDate
+  if (!due) return 'Monto a pagar'
+  const dueDay = dayjs(due)
+  if (dueDay.isBefore(dayjs(), 'day')) return 'Vencido'
+  return dueDay.isSame(dayjs(), 'month') ? 'Pago del mes' : 'Próximo pago'
 }
 
 const urgencyClass = (days: number | null) => {
@@ -289,6 +305,20 @@ const usageBarClass = (pct: number) => {
               </div>
               <div class="flex gap-1">
                 <button
+                  @click="openStatementsModal(card)"
+                  class="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 text-white transition hover:bg-white/30"
+                  title="Recibos mensuales"
+                >
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
+                </button>
+                <button
                   @click="openPaymentHistoryModal(card)"
                   class="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 text-white transition hover:bg-white/30"
                   title="Historial"
@@ -366,8 +396,15 @@ const usageBarClass = (pct: number) => {
               <!-- Deuda + vencimiento -->
               <div class="flex items-start justify-between">
                 <div>
-                  <p class="text-xs font-medium uppercase tracking-wide text-gray-400">
-                    Deuda del periodo
+                  <p
+                    class="text-xs font-medium uppercase tracking-wide"
+                    :class="
+                      amountDueLabel(getStatement(card.id)) === 'Vencido'
+                        ? 'text-red-500'
+                        : 'text-gray-400'
+                    "
+                  >
+                    {{ amountDueLabel(getStatement(card.id)) }}
                   </p>
                   <p class="text-2xl font-bold text-gray-900">
                     {{ formatCurrency(getStatement(card.id).totalAmount) }}
@@ -617,6 +654,12 @@ const usageBarClass = (pct: number) => {
       :card="cardToPay?.card ?? null"
       :suggested-amount="cardToPay?.suggestedAmount ?? 0"
       @save="handlePaymentSave"
+    />
+
+    <TarjetasCardStatementsModal
+      v-model:show="showStatementsModal"
+      :card="cardForStatements"
+      @change="loadStatements"
     />
 
     <TarjetasCardPaymentHistoryModal

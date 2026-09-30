@@ -44,6 +44,7 @@ export default defineEventHandler(async (event) => {
   } else if (body.isRecurring === false) {
     updateData.frequency = null
   }
+  if (body.isRecurring === false) updateData.skippedMonths = []
 
   if (body.notes !== undefined) {
     updateData.notes = body.notes || null

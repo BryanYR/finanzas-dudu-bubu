@@ -14,6 +14,7 @@ import { prisma } from '@server/utils/db'
  *
  * Misma lógica que ya usaba `payment-plan/suggestions.get.ts` inline;
  * extraída aquí para reutilizarla también en `budgets/calculate.post.ts`.
+ * (payment-plan ya no la usa: calcula por ciclo de sueldo, ver paymentPlanService.ts.)
  */
 export async function getCurrentBalance(userId: number): Promise<number> {
   const now = new Date()

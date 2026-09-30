@@ -61,6 +61,81 @@ export function computeBillingWindows(
   }
 }
 
+/**
+ * Ciclo de facturación cuyo recibo vence en `dueDate`: el corte es el `billingDay`
+ * del mismo mes si el pago cae después del corte, o del mes anterior si no
+ * (inverso de getPaymentDueDate).
+ */
+export function billingWindowForDueDate(card: CardBillingConfig, dueDate: Date): BillingWindow {
+  const endMonthOffset = card.paymentDay > card.billingDay ? 0 : -1
+  const y = dueDate.getFullYear()
+  const m = dueDate.getMonth() + endMonthOffset
+  return {
+    start: new Date(y, m - 1, card.billingDay + 1, 0, 0, 0),
+    end: new Date(y, m, card.billingDay, 23, 59, 59),
+    paymentDue: dueDate,
+  }
+}
+
+/** Recibo pendiente más próximo (aunque ya esté vencido), o null si no hay recibos cargados. */
+export function findNextUnpaidStatement(cardId: number, userId: number) {
+  return prisma.creditCardStatement.findFirst({
+    where: { creditCardId: cardId, userId, isPaid: false },
+    orderBy: { dueDate: 'asc' },
+  })
+}
+
+/**
+ * Monto a pagar de la tarjeta: si hay un CreditCardStatement pendiente, manda su monto
+ * y vencimiento (el pago del mes o, si ya se pagó, el siguiente). Si no hay recibos
+ * cargados, cae al cálculo por Expense del periodo activo + carriedBalance.
+ * `usedAmount` siempre es carriedBalance + gastos del periodo (uso de la línea).
+ */
+export async function resolveCardAmountDue(
+  card: { id: number; carriedBalance: unknown } & CardBillingConfig,
+  userId: number,
+  today = new Date()
+) {
+  const period = await resolveActiveBillingPeriod(card, userId, today)
+  const expenses = await prisma.expense.findMany({
+    where: {
+      userId,
+      creditCardId: card.id,
+      date: { gte: period.billingStartDate, lte: period.billingEndDate },
+      isPaidOff: false,
+    },
+  })
+  // carriedBalance / expense.amount vienen como Prisma.Decimal
+  const periodExpensesAmount = expenses.reduce((sum, e) => sum + Number(e.amount), 0)
+  const usedAmount = Number(card.carriedBalance) + periodExpensesAmount
+
+  const statement = await findNextUnpaidStatement(card.id, userId)
+  if (statement) {
+    const window = billingWindowForDueDate(card, statement.dueDate)
+    return {
+      source: 'statement' as const,
+      statementId: statement.id,
+      amountDue: Number(statement.amount),
+      billingStartDate: window.start,
+      billingEndDate: window.end,
+      paymentDueDate: statement.dueDate,
+      usedAmount,
+      periodExpensesAmount,
+      expenses,
+    }
+  }
+
+  return {
+    source: 'expenses' as const,
+    statementId: null,
+    amountDue: usedAmount,
+    ...period,
+    usedAmount,
+    periodExpensesAmount,
+    expenses,
+  }
+}
+
 export async function resolveActiveBillingPeriod(
   card: { id: number } & CardBillingConfig,
   userId: number,

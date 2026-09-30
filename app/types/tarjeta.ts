@@ -21,13 +21,30 @@ export interface CreditCard {
 }
 
 export interface CardStatement {
+  /** Monto a pagar: recibo pendiente más próximo, o carriedBalance + gastos del periodo si no hay recibos */
   totalAmount: number
+  source?: 'statement' | 'expenses'
+  statementId?: number | null
+  /** Uso de la línea: carriedBalance + gastos del periodo (base de creditUsagePercent/availableCredit) */
+  usedAmount?: number
   periodExpensesAmount: number
   carriedBalance: number
   transactionCount: number
   creditUsagePercent: number
   availableCredit: number
   paymentDueDate: string
+}
+
+/** Recibo mensual de la tarjeta (CreditCardStatement): monto a pagar por vencimiento */
+export interface CardBill {
+  id: number
+  dueDate: string
+  amount: number
+  isPaid: boolean
+  paidAt: string | null
+  paidAmount: number | null
+  notes: string | null
+  creditCardId: number
 }
 
 export interface CardPayment {

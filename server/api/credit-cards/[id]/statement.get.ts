@@ -1,7 +1,7 @@
 import { prisma } from '@server/utils/db'
 import { requireUser } from '@server/utils/auth'
 import { serializeDecimals } from '@server/utils/serialize'
-import { resolveActiveBillingPeriod } from '@server/services/creditCardService'
+import { resolveCardAmountDue } from '@server/services/creditCardService'
 
 export default defineEventHandler(async (event) => {
   const user = await requireUser(event)
@@ -13,30 +13,15 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'Tarjeta no encontrada' })
   }
 
-  const { billingStartDate, billingEndDate, paymentDueDate } = await resolveActiveBillingPeriod(
-    card,
-    user.id
-  )
+  // amountDue = recibo pendiente más próximo (CreditCardStatement) si hay alguno cargado;
+  // si no, carriedBalance + gastos no pagados del periodo activo. usedAmount (uso de la
+  // línea) siempre es carriedBalance + gastos del periodo.
+  const due = await resolveCardAmountDue(card, user.id)
 
-  const expenses = await prisma.expense.findMany({
-    where: {
-      userId: user.id,
-      creditCardId: id,
-      date: { gte: billingStartDate, lte: billingEndDate },
-      isPaidOff: false,
-    },
-  })
-
-  // card.creditLimit, card.carriedBalance y expense.amount vienen de la BD como
-  // Prisma.Decimal; Number(...) los normaliza para poder operar con aritmética JS.
+  // card.creditLimit / card.carriedBalance vienen de la BD como Prisma.Decimal
   const creditLimit = Number(card.creditLimit)
   const carriedBalance = Number(card.carriedBalance)
-  const periodExpensesAmount = expenses.reduce((sum, expense) => sum + Number(expense.amount), 0)
-  // carriedBalance cubre lo que el banco reporta como usado (cuotas en curso, saldo
-  // previo a registrar la tarjeta en la app) y que no existe como Expense individual
-  const totalAmount = carriedBalance + periodExpensesAmount
-
-  const creditUsagePercent = (totalAmount / creditLimit) * 100
+  const creditUsagePercent = (due.usedAmount / creditLimit) * 100
 
   return serializeDecimals({
     card: {
@@ -49,20 +34,23 @@ export default defineEventHandler(async (event) => {
       paymentDay: card.paymentDay,
     },
     billingPeriod: {
-      startDate: billingStartDate.toISOString(),
-      endDate: billingEndDate.toISOString(),
-      paymentDueDate: paymentDueDate.toISOString(),
+      startDate: due.billingStartDate.toISOString(),
+      endDate: due.billingEndDate.toISOString(),
+      paymentDueDate: due.paymentDueDate.toISOString(),
     },
     statement: {
-      totalAmount,
-      periodExpensesAmount,
+      totalAmount: due.amountDue,
+      source: due.source,
+      statementId: due.statementId,
+      usedAmount: due.usedAmount,
+      periodExpensesAmount: due.periodExpensesAmount,
       carriedBalance,
-      transactionCount: expenses.length,
+      transactionCount: due.expenses.length,
       creditUsagePercent: Number(creditUsagePercent.toFixed(2)),
-      availableCredit: Math.max(0, creditLimit - totalAmount),
-      billingEndDate: billingEndDate.toISOString(),
-      paymentDueDate: paymentDueDate.toISOString(),
+      availableCredit: Math.max(0, creditLimit - due.usedAmount),
+      billingEndDate: due.billingEndDate.toISOString(),
+      paymentDueDate: due.paymentDueDate.toISOString(),
     },
-    expenses,
+    expenses: due.expenses,
   })
 })

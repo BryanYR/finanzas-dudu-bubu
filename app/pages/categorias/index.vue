@@ -61,8 +61,8 @@ const deleteCategory = async (category: Category) => {
   try {
     await $authFetch(`/api/categories/${category.id}`, { method: 'DELETE' })
     await refresh()
-  } catch {
-    toast.error('Error al eliminar la categoría')
+  } catch (err) {
+    toast.error(getErrorMessage(err, 'Error al eliminar la categoría'))
   } finally {
     deleting.value = false
   }

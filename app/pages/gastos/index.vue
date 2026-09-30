@@ -9,6 +9,8 @@ const toast = useToast()
 const { confirm } = useConfirm()
 const { formatDate, formatCurrency } = useDateFormatter()
 const $authFetch = useAuthFetch()
+const { $dayjs } = useNuxtApp()
+const dayjs = $dayjs as typeof import('dayjs')
 
 const expenses = ref<Expense[]>([])
 const categories = ref<Category[]>([])
@@ -16,6 +18,8 @@ const creditCards = ref<CreditCard[]>([])
 const loading = ref(false)
 const showModal = ref(false)
 const editingExpense = ref<Expense | null>(null)
+const showSkipModal = ref(false)
+const skipExpense = ref<Expense | null>(null)
 const filterType = ref('all')
 const searchQuery = ref('')
 
@@ -30,8 +34,8 @@ const fetchAll = async () => {
     expenses.value = exp
     categories.value = cats
     creditCards.value = cards
-  } catch {
-    toast.error('Error al cargar los datos')
+  } catch (err) {
+    toast.error(getErrorMessage(err, 'Error al cargar los datos'))
   } finally {
     loading.value = false
   }
@@ -49,9 +53,21 @@ const byMethod = computed(() =>
   )
 )
 
+const currentMonth = dayjs().format('YYYY-MM')
+
+const monthLabel = (ym: string) => dayjs(`${ym}-01`).format('MMM YYYY')
+
+// Meses omitidos actuales o futuros (los pasados no se muestran)
+const upcomingSkipped = (e: Expense) => (e.skippedMonths ?? []).filter((m) => m >= currentMonth)
+
+const handleSkipMonths = (e: Expense) => {
+  skipExpense.value = e
+  showSkipModal.value = true
+}
+
 const recurringTotal = computed(() =>
   expenses.value
-    .filter((e) => e.isRecurring)
+    .filter((e) => e.isRecurring && !e.skippedMonths?.includes(currentMonth))
     .reduce((s, e) => {
       if (e.frequency === 'weekly') return s + e.amount * 4
       if (e.frequency === 'biweekly') return s + e.amount * 2
@@ -101,8 +117,8 @@ const handleDelete = async (expense: Expense) => {
     await $authFetch(`/api/expenses/${expense.id}`, { method: 'DELETE' })
     await fetchAll()
     toast.success('Gasto eliminado')
-  } catch {
-    toast.error('Error al eliminar el gasto')
+  } catch (err) {
+    toast.error(getErrorMessage(err, 'Error al eliminar el gasto'))
   }
 }
 
@@ -145,20 +161,28 @@ const methodFilters = [
         <h1 class="text-xl font-bold text-gray-900 lg:text-2xl">Gastos</h1>
         <p class="text-sm text-gray-500">{{ expenses.length }} registros en total</p>
       </div>
-      <button
-        @click="handleCreate"
-        class="flex h-10 items-center gap-2 rounded-xl bg-red-500 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-red-600 active:scale-95"
-      >
-        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2.5"
-            d="M12 4v16m8-8H4"
-          />
-        </svg>
-        Nuevo
-      </button>
+      <div class="flex items-center gap-2">
+        <NuxtLink
+          to="/gastos/rapido"
+          class="flex h-10 items-center rounded-xl bg-white px-4 text-sm font-semibold text-red-500 shadow-sm ring-1 ring-red-100 transition hover:bg-red-50 active:scale-95"
+        >
+          Rápido
+        </NuxtLink>
+        <button
+          @click="handleCreate"
+          class="flex h-10 items-center gap-2 rounded-xl bg-red-500 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-red-600 active:scale-95"
+        >
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2.5"
+              d="M12 4v16m8-8H4"
+            />
+          </svg>
+          Nuevo
+        </button>
+      </div>
     </div>
 
     <!-- Stats -->
@@ -330,6 +354,16 @@ const methodFilters = [
               >
                 {{ frequencyLabel[expense.frequency ?? ''] ?? 'Fijo' }}
               </span>
+              <!-- Badge mes omitido -->
+              <span
+                v-if="expense.isRecurring && upcomingSkipped(expense).length"
+                class="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-amber-700"
+              >
+                Omitido: {{ monthLabel(upcomingSkipped(expense)[0]!) }}
+                <template v-if="upcomingSkipped(expense).length > 1"
+                  >+{{ upcomingSkipped(expense).length - 1 }}</template
+                >
+              </span>
               <!-- Badge cuotas -->
               <span
                 v-if="expense.installments && expense.installments > 1"
@@ -360,6 +394,21 @@ const methodFilters = [
 
           <!-- Acciones -->
           <div class="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+            <button
+              v-if="expense.isRecurring"
+              @click="handleSkipMonths(expense)"
+              class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-amber-50 hover:text-amber-600"
+              title="Omitir mes"
+            >
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2zM9 15h6"
+                />
+              </svg>
+            </button>
             <button
               @click="handleEdit(expense)"
               class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-indigo-50 hover:text-indigo-600"
@@ -401,5 +450,6 @@ const methodFilters = [
       :credit-cards="creditCards"
       @save="handleSave"
     />
+    <GastosSkipMonthsModal v-model:show="showSkipModal" :expense="skipExpense" @save="fetchAll" />
   </div>
 </template>

@@ -27,14 +27,16 @@ export default defineEventHandler(async (event) => {
   // Login exitoso: resetear contador de intentos
   clearRateLimit(`login:${ip}`)
 
-  const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET!, { expiresIn: '7d' })
+  const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET!, { expiresIn: '30d' })
 
+  // 'lax' (no 'strict'): al abrir la PWA desde el ícono, iOS a veces trata el
+  // lanzamiento como navegación externa y 'strict' no envía la cookie → /login.
   setCookie(event, 'token', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'lax',
     path: '/',
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: 60 * 60 * 24 * 30,
   })
 
   return {

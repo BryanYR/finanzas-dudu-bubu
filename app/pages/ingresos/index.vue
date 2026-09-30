@@ -70,8 +70,8 @@ const deleteIncome = async (income: Income) => {
   try {
     await $authFetch(`/api/incomes/${income.id}`, { method: 'DELETE' })
     await refresh()
-  } catch {
-    toast.error('Error al eliminar el ingreso')
+  } catch (err) {
+    toast.error(getErrorMessage(err, 'Error al eliminar el ingreso'))
   } finally {
     deleting.value = false
   }
@@ -88,8 +88,8 @@ const generateRecurring = async () => {
     if (result.generated.length > 0)
       toast.success(`Se generaron ${result.generated.length} ingresos recurrentes`)
     else toast.info('No hay ingresos pendientes por generar este mes')
-  } catch {
-    toast.error('Error al generar ingresos recurrentes')
+  } catch (err) {
+    toast.error(getErrorMessage(err, 'Error al generar ingresos recurrentes'))
   } finally {
     generatingRecurring.value = false
   }

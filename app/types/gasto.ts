@@ -8,6 +8,7 @@ export interface Expense {
   date: string
   isRecurring: boolean
   frequency?: string
+  skippedMonths?: string[]
   paymentMethod: string
   notes?: string
   categoryId: number

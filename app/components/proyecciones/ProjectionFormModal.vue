@@ -46,12 +46,12 @@ const close = () => {
 
 const handleCalculate = async () => {
   if (!form.name || form.totalBudget <= 0 || !form.startDate || !form.endDate) {
-    alert('Por favor completa todos los campos requeridos')
+    useToast().warning('Por favor completa todos los campos requeridos')
     return
   }
 
   if (new Date(form.endDate) <= new Date(form.startDate)) {
-    alert('La fecha de fin debe ser posterior a la fecha de inicio')
+    useToast().warning('La fecha de fin debe ser posterior a la fecha de inicio')
     return
   }
 
@@ -72,7 +72,7 @@ const handleCalculate = async () => {
     step.value = 2
   } catch (err) {
     console.error('Error al calcular la proyección:', err)
-    alert('Error al calcular la proyección')
+    useToast().error(getErrorMessage(err, 'Error al calcular la proyección'))
   } finally {
     calculating.value = false
   }
@@ -107,7 +107,7 @@ const handleSave = async () => {
     close()
   } catch (err) {
     console.error('Error al guardar la proyección:', err)
-    alert('Error al guardar la proyección')
+    useToast().error(getErrorMessage(err, 'Error al guardar la proyección'))
   } finally {
     saving.value = false
   }

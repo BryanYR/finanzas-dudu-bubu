@@ -124,8 +124,8 @@ const handleSave = async () => {
     emit('save')
     emit('update:show', false)
     setTimeout(() => resetForm(), 300)
-  } catch {
-    useToast().error('Error al guardar la tarjeta')
+  } catch (err) {
+    useToast().error(getErrorMessage(err, 'Error al guardar la tarjeta'))
   } finally {
     saving.value = false
   }
@@ -365,7 +365,9 @@ const inputClass =
         />
         <p class="mt-1 text-xs text-gray-500">
           Deuda que tu banco reporta como usada pero que no vas a registrar gasto por gasto (cuotas
-          en curso, saldo de antes de usar la app). Actualízalo con cada estado de cuenta nuevo.
+          en curso, saldo de antes de usar la app). Se usa para el % de uso y el disponible;
+          actualízalo con cada estado de cuenta nuevo. El monto a pagar de cada mes se carga en
+          "Recibos mensuales".
         </p>
       </div>
 

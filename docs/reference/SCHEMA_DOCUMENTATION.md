@@ -44,6 +44,7 @@ Categorización de ingresos y gastos, con icono/color para la UI.
 ### 4. `Expense`
 
 - Mismos campos base que `Income` (`amount`, `description`, `date`, `isRecurring`, `frequency`, `categoryId`, `notes`).
+- `skippedMonths: String[] @default([])` — meses `"YYYY-MM"` en que un gasto recurrente no aplica (p. ej. una pensión que no se paga un mes por acuerdo; no se acumula). Se usa un array en vez de un booleano de "suspendido" para que el gasto se reanude solo y las proyecciones de otros meses no se alteren. Se gestiona con `PUT /api/expenses/:id/skipped-months`.
 - `paymentMethod: String @default("cash")` — `"cash" | "debit" | "credit"`.
 - `creditCardId: Int?` — opcional; **`onDelete: SetNull`** (excepción deliberada al patrón cascade: si se borra la tarjeta, el gasto conserva su historial pero pierde la referencia a la tarjeta).
 - `isPaidOff: Boolean @default(false)` — para gastos con tarjeta: indica si el estado de cuenta que lo contiene ya fue pagado (lo marca `credit-cards/[id]/pay.post.ts` al registrar un pago de período).
@@ -54,9 +55,19 @@ Categorización de ingresos y gastos, con icono/color para la UI.
 - `name`, `bank`, `lastDigits` (4 dígitos), `creditLimit`.
 - `billingDay` / `paymentDay`: día del mes (1–31) de corte y de pago respectivamente. Toda la lógica de período de facturación (`statement.get.ts`, `pay.post.ts`, `dashboard`/`payment-plan`) deriva del `billingDay` comparado con el día actual.
 - `interestRate: Float?` — opcional en el modelo (a diferencia del schema Zod `CreditCardSchema`, que lo exige al crear).
+- `carriedBalance: Decimal @default(0)` — saldo usado que reporta el banco y que no existe como `Expense` (cuotas en curso, deuda previa a usar la app). Se actualiza a mano con cada estado de cuenta; alimenta el % de uso y el disponible. **No** es el monto a pagar del mes (eso es `CreditCardStatement`), salvo en tarjetas sin recibos cargados, donde el monto a pagar se estima como `carriedBalance` + gastos del período.
 - `isActive: Boolean @default(true)`.
 - `expenses: Expense[]` — relación inversa; el borrado de la tarjeta no borra los gastos (ver `Expense.creditCardId` arriba).
+- `statements: CreditCardStatement[]` — recibos mensuales.
 - Índice: `@@index([userId, isActive])`.
+
+### 5b. `CreditCardStatement`
+
+- Un recibo por vencimiento: `dueDate`, `amount` (monto total a pagar del recibo), `isPaid`, `paidAt?`, `paidAmount?` (lo realmente pagado), `notes?`.
+- Existe porque la app no conoce los cronogramas de cuotas de las tarjetas: el monto de cada recibo lo carga el usuario (estado de cuenta o cálculo propio). El recibo pendiente de `dueDate` más próximo es el "monto a pagar" que muestra la tarjeta; `pay.post.ts` lo marca pagado y la tarjeta pasa al siguiente.
+- Pagos parciales no modelados: el recibo se marca pagado con el `paidAmount` real.
+- `creditCardId` → `CreditCard` y `userId` → `User`, ambos `onDelete: Cascade`.
+- Índices: `@@index([creditCardId, isPaid, dueDate])`, `@@index([userId])`.
 
 ### 6. `SavingsGoal`
 
@@ -129,6 +140,8 @@ Planificador "qué pasaría si" independiente (viajes, compras grandes) — **no
 | `Expense` → `Category`                | **Restrict** | No se puede borrar una categoría con gastos asociados                   |
 | `Expense` → `CreditCard`              | **SetNull**  | Borrar la tarjeta conserva el historial de gastos, pierde la referencia |
 | `CreditCard` → `User`                 | Cascade      | —                                                                       |
+| `CreditCardStatement` → `CreditCard`  | Cascade      | Borrar la tarjeta borra sus recibos mensuales                           |
+| `CreditCardStatement` → `User`        | Cascade      | —                                                                       |
 | `SavingsGoal` → `User`                | Cascade      | —                                                                       |
 | `SavingsContribution` → `SavingsGoal` | Cascade      | Borrar la meta borra su historial de aportes                            |
 | `Debt` → `User`                       | Cascade      | —                                                                       |
@@ -158,6 +171,10 @@ Planificador "qué pasaría si" independiente (viajes, compras grandes) — **no
 
 // CreditCard
 @@index([userId, isActive])
+
+// CreditCardStatement
+@@index([creditCardId, isPaid, dueDate])
+@@index([userId])
 
 // SavingsGoal
 @@index([userId, isCompleted])

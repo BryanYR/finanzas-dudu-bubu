@@ -98,7 +98,7 @@ const handleSave = async () => {
     setTimeout(() => resetForm(), 300)
   } catch (err) {
     console.error('Error al guardar categoría:', err)
-    useToast().error('Error al guardar la categoría')
+    useToast().error(getErrorMessage(err, 'Error al guardar la categoría'))
   } finally {
     saving.value = false
   }

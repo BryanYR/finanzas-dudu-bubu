@@ -70,8 +70,8 @@ const deleteGoal = async (goal: SavingsGoal) => {
   try {
     await $authFetch(`/api/savings/${goal.id}`, { method: 'DELETE' })
     await refresh()
-  } catch {
-    toast.error('Error al eliminar la meta de ahorro')
+  } catch (err) {
+    toast.error(getErrorMessage(err, 'Error al eliminar la meta de ahorro'))
   } finally {
     deleting.value = false
   }

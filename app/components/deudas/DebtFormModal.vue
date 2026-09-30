@@ -129,7 +129,7 @@ const handleSave = async () => {
     setTimeout(() => resetForm(), 300)
   } catch (err) {
     console.error('Error al guardar deuda:', err)
-    useToast().error('Error al guardar la deuda')
+    useToast().error(getErrorMessage(err, 'Error al guardar la deuda'))
   } finally {
     saving.value = false
   }
@@ -289,11 +289,11 @@ const handleSave = async () => {
             type="number"
             required
             min="1"
-            max="31"
+            max="28"
             class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
             placeholder="15"
           />
-          <p class="mt-1 text-xs text-gray-500">Día del mes en que vence cada cuota (1-31)</p>
+          <p class="mt-1 text-xs text-gray-500">Día del mes en que vence cada cuota (1-28)</p>
         </div>
 
         <!-- Número total de cuotas -->

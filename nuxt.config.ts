@@ -10,6 +10,30 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   css: ['./app/assets/css/main.css'],
 
+  // PWA instalable (Android e iOS). Sin service worker: ver docs/plans/registro-rapido-de-gastos.md
+  app: {
+    head: {
+      htmlAttrs: { lang: 'es' },
+      title: 'FinanzApp',
+      meta: [
+        {
+          name: 'viewport',
+          content: 'width=device-width, initial-scale=1, viewport-fit=cover',
+        },
+        { name: 'theme-color', content: '#4f46e5' },
+        { name: 'mobile-web-app-capable', content: 'yes' },
+        { name: 'apple-mobile-web-app-capable', content: 'yes' },
+        { name: 'apple-mobile-web-app-status-bar-style', content: 'default' },
+        { name: 'apple-mobile-web-app-title', content: 'FinanzApp' },
+      ],
+      link: [
+        { rel: 'manifest', href: '/manifest.webmanifest' },
+        { rel: 'icon', href: '/favicon.ico' },
+        { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
+      ],
+    },
+  },
+
   dayjs: {
     locales: ['es'],
     defaultLocale: 'es',

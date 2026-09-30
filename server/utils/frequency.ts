@@ -116,17 +116,55 @@ function countAnnual(anchorDate: Date, startDay: number, endDay: number): number
  * - `weekly`: una ocurrencia cada 7 días desde `anchorDate`.
  * - `annual`: una ocurrencia por año si el aniversario (mes/día de
  *   `anchorDate`) cae dentro del rango.
+ *
+ * `skippedMonths` ("YYYY-MM") descuenta las ocurrencias que caen en meses
+ * omitidos (ej. un gasto fijo que no se paga ese mes por acuerdo).
  */
 export function countOccurrencesInRange(
   frequency: Frequency,
   anchorDate: Date,
   rangeStart: Date,
-  rangeEnd: Date
+  rangeEnd: Date,
+  skippedMonths: string[] = []
 ): number {
   const startDay = toDayNumber(rangeStart)
   const endDay = toDayNumber(rangeEnd)
   if (startDay > endDay) return 0
 
+  const total = countRaw(frequency, anchorDate, startDay, endDay)
+  if (skippedMonths.length === 0) return total
+
+  // Resta las ocurrencias que caen en meses omitidos (intersección mes ∩ rango).
+  let skipped = 0
+  for (const { year, month } of monthsOverlapping(startDay, endDay)) {
+    if (!skippedMonths.includes(toYearMonth(year, month))) continue
+    const monthStart = Math.max(startDay, Date.UTC(year, month, 1))
+    const monthEnd = Math.min(endDay, Date.UTC(year, month, daysInMonth(year, month)))
+    skipped += countRaw(frequency, anchorDate, monthStart, monthEnd)
+  }
+  return Math.max(0, total - skipped)
+}
+
+/** Clave "YYYY-MM" para `month` 0-indexado — mismo formato que `Expense.skippedMonths`. */
+export function toYearMonth(year: number, month: number): string {
+  return `${year}-${String(month + 1).padStart(2, '0')}`
+}
+
+/** true si el gasto recurrente está omitido en el mes (0-indexado) indicado. */
+export function isMonthSkipped(
+  skippedMonths: string[] | null | undefined,
+  year: number,
+  month: number
+): boolean {
+  return !!skippedMonths?.includes(toYearMonth(year, month))
+}
+
+function countRaw(
+  frequency: Frequency,
+  anchorDate: Date,
+  startDay: number,
+  endDay: number
+): number {
   switch (frequency) {
     case 'monthly':
       return countMonthly(anchorDate, startDay, endDay)

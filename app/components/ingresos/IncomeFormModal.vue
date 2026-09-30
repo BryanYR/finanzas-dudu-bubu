@@ -104,7 +104,7 @@ const handleSave = async () => {
     setTimeout(() => resetForm(), 300)
   } catch (err) {
     console.error('Error al guardar ingreso:', err)
-    useToast().error('Error al guardar el ingreso')
+    useToast().error(getErrorMessage(err, 'Error al guardar el ingreso'))
   } finally {
     saving.value = false
   }

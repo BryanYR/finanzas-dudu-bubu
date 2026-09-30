@@ -94,7 +94,7 @@ const handleDeletePayment = async (payment: DebtPayment) => {
     emit('deleted')
   } catch (err) {
     console.error('Error al eliminar pago:', err)
-    useToast().error('Error al eliminar el pago')
+    useToast().error(getErrorMessage(err, 'Error al eliminar el pago'))
   } finally {
     deleting.value = null
   }

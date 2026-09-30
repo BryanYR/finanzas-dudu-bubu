@@ -1,7 +1,11 @@
 import { prisma } from '@server/utils/db'
 import { requireUser } from '@server/utils/auth'
 import { validateBody, CreditCardPaymentSchema } from '@server/utils/validation'
-import { computeBillingWindows } from '@server/services/creditCardService'
+import {
+  billingWindowForDueDate,
+  computeBillingWindows,
+  findNextUnpaidStatement,
+} from '@server/services/creditCardService'
 
 export default defineEventHandler(async (event) => {
   const user = await requireUser(event)
@@ -21,15 +25,29 @@ export default defineEventHandler(async (event) => {
   })
   if (!category) throw createError({ statusCode: 404, message: 'Categoría no encontrada' })
 
-  // Obtener el período cerrado usando la misma lógica del servicio
-  const { lastClosed } = computeBillingWindows(card)
+  const paidAt = body.date ? new Date(body.date) : new Date()
 
-  // Marcar todos los gastos del período cerrado como pagados
+  // Si hay un recibo cargado pendiente, el pago lo salda (y la tarjeta pasa a mostrar el
+  // siguiente); los gastos a marcar son los del ciclo que vence en ese recibo. Si no hay
+  // recibos, se paga el período cerrado como antes.
+  const statement = await findNextUnpaidStatement(id, user.id)
+  const window = statement
+    ? billingWindowForDueDate(card, statement.dueDate)
+    : computeBillingWindows(card).lastClosed
+
+  if (statement) {
+    await prisma.creditCardStatement.update({
+      where: { id: statement.id },
+      data: { isPaid: true, paidAt, paidAmount: body.amount },
+    })
+  }
+
+  // Marcar todos los gastos del ciclo pagado como pagados
   await prisma.expense.updateMany({
     where: {
       userId: user.id,
       creditCardId: id,
-      date: { gte: lastClosed.start, lte: lastClosed.end },
+      date: { gte: window.start, lte: window.end },
       isPaidOff: false,
     },
     data: { isPaidOff: true },
@@ -41,7 +59,7 @@ export default defineEventHandler(async (event) => {
     data: {
       description: `Pago Tarjeta ${card.name} - ${card.bank}`,
       amount: body.amount,
-      date: body.date ? new Date(body.date) : new Date(),
+      date: paidAt,
       isRecurring: false,
       paymentMethod: 'debit' as const,
       creditCardId: null,

@@ -148,7 +148,7 @@ const handleSave = async () => {
     setTimeout(() => resetForm(), 300)
   } catch (err) {
     console.error('Error al guardar gasto:', err)
-    useToast().error('Error al guardar el gasto')
+    useToast().error(getErrorMessage(err, 'Error al guardar el gasto'))
   } finally {
     saving.value = false
   }
@@ -164,51 +164,11 @@ const selectedCard = computed(
   () => props.creditCards.find((c) => c.id === form.creditCardId) ?? null
 )
 
-/**
- * Calculates installment cost using:
- * 1. installmentFees table (exact, from bank calculator)
- * 2. TEA formula as fallback (annuity / French amortization)
- * 3. Simple division if no rate info available
- */
-const installmentCost = computed(() => {
-  if (form.paymentMethod !== 'credit' || form.installments <= 1 || form.amount <= 0) return null
-  const card = selectedCard.value
-  if (!card) return null
-
-  const n = Number(form.installments)
-  const principal = Number(form.amount)
-
-  // Option 1: fee table lookup (most accurate — exact bank data)
-  if (card.installmentFees) {
-    const feePercent = card.installmentFees[String(n)]
-    if (feePercent != null && feePercent > 0) {
-      const totalInterest = (principal * feePercent) / 100
-      const totalToPay = principal + totalInterest
-      const monthlyPayment = totalToPay / n
-      return { monthlyPayment, totalInterest, totalToPay, feePercent, source: 'table' as const }
-    }
-  }
-
-  // Option 2: TEA → TEM → annuity formula
-  if (card.interestRate && card.interestRate > 0) {
-    const tem = Math.pow(1 + card.interestRate / 100, 1 / 12) - 1
-    const monthlyPayment =
-      tem === 0 ? principal / n : (principal * tem) / (1 - Math.pow(1 + tem, -n))
-    const totalToPay = monthlyPayment * n
-    const totalInterest = totalToPay - principal
-    const feePercent = (totalInterest / principal) * 100
-    return { monthlyPayment, totalInterest, totalToPay, feePercent, source: 'tea' as const }
-  }
-
-  // Option 3: no rate info — show simple division, no interest
-  return {
-    monthlyPayment: principal / n,
-    totalInterest: 0,
-    totalToPay: principal,
-    feePercent: 0,
-    source: 'none' as const,
-  }
-})
+const installmentCost = computed(() =>
+  form.paymentMethod === 'credit'
+    ? computeInstallmentCost(selectedCard.value, Number(form.amount), Number(form.installments))
+    : null
+)
 </script>
 
 <template>

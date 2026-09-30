@@ -24,6 +24,7 @@ const pageTitle = computed(() => {
   const names: Record<string, string> = {
     index: 'Inicio',
     gastos: 'Gastos',
+    'gastos-rapido': 'Registro rápido',
     ingresos: 'Ingresos',
     tarjetas: 'Tarjetas',
     ahorros: 'Ahorros',
@@ -148,6 +149,24 @@ const isActive = (item: (typeof bottomNavItems)[0]) =>
         <slot />
       </main>
     </div>
+
+    <!-- Registro rápido de gasto (solo mobile) -->
+    <NuxtLink
+      v-if="route.path !== '/gastos/rapido'"
+      to="/gastos/rapido"
+      aria-label="Registrar gasto"
+      class="fixed right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-red-500 text-white shadow-lg transition active:scale-95 lg:hidden"
+      style="bottom: calc(4.5rem + env(safe-area-inset-bottom))"
+    >
+      <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2.5"
+          d="M12 4v16m8-8H4"
+        />
+      </svg>
+    </NuxtLink>
 
     <!-- Bottom Navigation (solo mobile) -->
     <nav

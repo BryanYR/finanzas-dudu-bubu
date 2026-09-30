@@ -22,8 +22,8 @@ const fetchDebts = async () => {
   loading.value = true
   try {
     debts.value = await $authFetch<Debt[]>('/api/debts')
-  } catch {
-    toast.error('Error al cargar las deudas')
+  } catch (err) {
+    toast.error(getErrorMessage(err, 'Error al cargar las deudas'))
   } finally {
     loading.value = false
   }
@@ -91,8 +91,8 @@ const handleDelete = async (d: Debt) => {
     await $authFetch(`/api/debts/${d.id}`, { method: 'DELETE' })
     await fetchDebts()
     toast.success('Deuda eliminada')
-  } catch {
-    toast.error('Error al eliminar la deuda')
+  } catch (err) {
+    toast.error(getErrorMessage(err, 'Error al eliminar la deuda'))
   }
 }
 

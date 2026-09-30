@@ -64,7 +64,8 @@ export default defineEventHandler(async (event) => {
       expense.frequency as Frequency,
       new Date(expense.date),
       startDate,
-      endDate
+      endDate,
+      expense.skippedMonths
     )
     return sum + occurrences * Number(expense.amount)
   }, 0)
