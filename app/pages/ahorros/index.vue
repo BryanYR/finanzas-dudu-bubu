@@ -166,7 +166,7 @@ const filters = [
     </div>
 
     <!-- Stats (compact, only when no summary) -->
-    <div v-if="(goals ?? []).length === 0" class="grid grid-cols-3 gap-3">
+    <div v-if="(goals ?? []).length === 0" class="grid grid-cols-1 gap-3 sm:grid-cols-3">
       <div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
         <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Ahorrado</p>
         <p class="mt-1.5 text-lg font-bold text-emerald-600">{{ formatCurrency(totalSaved) }}</p>

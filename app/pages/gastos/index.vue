@@ -318,7 +318,7 @@ const methodFilters = [
         <div
           v-for="expense in filteredExpenses"
           :key="expense.id"
-          class="group flex items-center gap-4 px-4 py-3.5 transition-colors hover:bg-gray-50 lg:px-5"
+          class="group flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3.5 transition-colors hover:bg-gray-50 sm:flex-nowrap sm:gap-4 lg:px-5"
         >
           <!-- Ícono de categoría -->
           <div
@@ -372,7 +372,7 @@ const methodFilters = [
                 {{ expense.installments }} cuotas
               </span>
             </div>
-            <div class="mt-0.5 flex items-center gap-2 text-xs text-gray-400">
+            <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-gray-400">
               <span>{{ expense.category?.name ?? '—' }}</span>
               <span v-if="expense.creditCard"
                 >· {{ expense.creditCard.name }} ••••{{ expense.creditCard.lastDigits }}</span
@@ -383,7 +383,9 @@ const methodFilters = [
 
           <!-- Monto -->
           <div class="shrink-0 text-right">
-            <p class="text-base font-bold text-red-500">- {{ formatCurrency(expense.amount) }}</p>
+            <p class="whitespace-nowrap text-sm font-bold text-red-500 sm:text-base">
+              - {{ formatCurrency(expense.amount) }}
+            </p>
             <p
               v-if="expense.installments && expense.installments > 1"
               class="text-xs text-gray-400"
@@ -393,7 +395,9 @@ const methodFilters = [
           </div>
 
           <!-- Acciones -->
-          <div class="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          <div
+            class="flex w-full shrink-0 justify-end gap-1 border-t border-gray-50 pt-2 transition-opacity sm:w-auto sm:border-0 sm:pt-0 sm:opacity-0 sm:group-hover:opacity-100"
+          >
             <button
               v-if="expense.isRecurring"
               @click="handleSkipMonths(expense)"

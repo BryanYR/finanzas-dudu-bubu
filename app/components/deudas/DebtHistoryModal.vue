@@ -136,22 +136,30 @@ const handleDeletePayment = async (payment: DebtPayment) => {
       </div>
 
       <!-- Summary Cards -->
-      <div class="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+      <div class="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
         <div class="rounded-lg border border-green-200 bg-green-50 p-4">
           <p class="text-xs text-green-700">Capital Pagado</p>
-          <p class="mt-1 text-xl font-bold text-green-800">{{ formatCurrency(totalPrincipal) }}</p>
+          <p class="mt-1 break-words text-base font-bold text-green-800 sm:text-xl">
+            {{ formatCurrency(totalPrincipal) }}
+          </p>
         </div>
         <div class="rounded-lg border border-orange-200 bg-orange-50 p-4">
           <p class="text-xs text-orange-700">Intereses Pagados</p>
-          <p class="mt-1 text-xl font-bold text-orange-800">{{ formatCurrency(totalInterest) }}</p>
+          <p class="mt-1 break-words text-base font-bold text-orange-800 sm:text-xl">
+            {{ formatCurrency(totalInterest) }}
+          </p>
         </div>
         <div class="rounded-lg border border-purple-200 bg-purple-50 p-4">
           <p class="text-xs text-purple-700">Seguro Pagado</p>
-          <p class="mt-1 text-xl font-bold text-purple-800">{{ formatCurrency(totalInsurance) }}</p>
+          <p class="mt-1 break-words text-base font-bold text-purple-800 sm:text-xl">
+            {{ formatCurrency(totalInsurance) }}
+          </p>
         </div>
         <div class="rounded-lg border border-blue-200 bg-blue-50 p-4">
           <p class="text-xs text-blue-700">Total Pagado</p>
-          <p class="mt-1 text-xl font-bold text-blue-800">{{ formatCurrency(totalPaid) }}</p>
+          <p class="mt-1 break-words text-base font-bold text-blue-800 sm:text-xl">
+            {{ formatCurrency(totalPaid) }}
+          </p>
         </div>
       </div>
 
@@ -165,15 +173,15 @@ const handleDeletePayment = async (payment: DebtPayment) => {
       <!-- Payments List -->
       <div v-else-if="payments.length > 0" class="space-y-3">
         <h4 class="font-semibold text-gray-900">Pagos Registrados</h4>
-        <div class="max-h-96 space-y-2 overflow-y-auto">
+        <div class="space-y-2 sm:max-h-96 sm:overflow-y-auto">
           <div
             v-for="payment in payments"
             :key="payment.id"
             class="rounded-lg border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md"
           >
             <div class="flex items-start justify-between gap-3">
-              <div class="flex-1">
-                <div class="flex items-center gap-2">
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
                   <span
                     class="inline-flex items-center rounded-full bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-800"
                   >
@@ -181,7 +189,7 @@ const handleDeletePayment = async (payment: DebtPayment) => {
                   </span>
                   <span class="text-sm text-gray-500">{{ formatDate(payment.date) }}</span>
                 </div>
-                <div class="mt-2 grid grid-cols-4 gap-4 text-sm">
+                <div class="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-4">
                   <div>
                     <p class="text-gray-600">Capital</p>
                     <p class="font-semibold text-green-700">

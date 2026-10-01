@@ -3,7 +3,7 @@
     <Transition name="modal">
       <div
         v-if="modelValue"
-        class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-4 py-6 sm:items-center"
+        class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-3 py-4 sm:items-center sm:px-4 sm:py-6"
         @click.self="handleOverlayClick"
       >
         <!-- Overlay -->
@@ -12,7 +12,7 @@
         <!-- Modal -->
         <div
           :class="[
-            'relative z-50 my-8 flex max-h-[calc(100vh-4rem)] w-full flex-col rounded-xl bg-white shadow-xl transition-all',
+            'relative z-50 my-2 flex max-h-[calc(100dvh-1rem)] w-full flex-col rounded-xl bg-white shadow-xl transition-all sm:my-8 sm:max-h-[calc(100dvh-4rem)]',
             sizeClasses[size],
           ]"
         >

@@ -349,9 +349,9 @@ const installmentCost = computed(() =>
               >
             </p>
 
-            <div class="grid grid-cols-3 gap-2 text-center">
+            <div class="grid grid-cols-3 gap-1.5 text-center sm:gap-2">
               <div class="rounded-lg bg-white p-2 ring-1 ring-purple-100">
-                <p class="text-base font-bold text-purple-700">
+                <p class="text-sm font-bold text-purple-700 sm:text-base">
                   {{
                     new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(
                       installmentCost.monthlyPayment
@@ -361,7 +361,7 @@ const installmentCost = computed(() =>
                 <p class="text-[10px] text-gray-500">por cuota</p>
               </div>
               <div class="rounded-lg bg-white p-2 ring-1 ring-purple-100">
-                <p class="text-base font-bold text-gray-800">
+                <p class="text-sm font-bold text-gray-800 sm:text-base">
                   {{
                     new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(
                       installmentCost.totalToPay
@@ -372,7 +372,7 @@ const installmentCost = computed(() =>
               </div>
               <div class="rounded-lg bg-white p-2 ring-1 ring-purple-100">
                 <p
-                  class="text-base font-bold"
+                  class="text-sm font-bold sm:text-base"
                   :class="installmentCost.totalInterest > 0 ? 'text-red-600' : 'text-emerald-600'"
                 >
                   {{

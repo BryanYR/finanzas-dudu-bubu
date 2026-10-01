@@ -158,7 +158,7 @@ const filters = [
     </div>
 
     <!-- Stats -->
-    <div class="grid grid-cols-3 gap-3">
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
       <div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
         <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Total</p>
         <p class="mt-1.5 text-lg font-bold text-emerald-600 lg:text-xl">
@@ -274,7 +274,7 @@ const filters = [
         <div
           v-for="income in filteredIncomes"
           :key="income.id"
-          class="group flex items-center gap-4 px-4 py-3.5 transition-colors hover:bg-gray-50 lg:px-5"
+          class="group flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3.5 transition-colors hover:bg-gray-50 sm:flex-nowrap sm:gap-4 lg:px-5"
         >
           <!-- Ícono de categoría -->
           <div
@@ -300,7 +300,7 @@ const filters = [
                 {{ frequencyLabel[income.frequency ?? ''] ?? 'Fijo' }}
               </span>
             </div>
-            <div class="mt-0.5 flex items-center gap-2 text-xs text-gray-400">
+            <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-gray-400">
               <span>{{ income.category?.name ?? '—' }}</span>
               <span>·</span>
               <span>{{ formatDate(income.date) }}</span>
@@ -309,14 +309,14 @@ const filters = [
 
           <!-- Monto -->
           <div class="shrink-0 text-right">
-            <p class="text-base font-bold text-emerald-600">
+            <p class="whitespace-nowrap text-sm font-bold text-emerald-600 sm:text-base">
               + {{ formatCurrency(income.amount) }}
             </p>
           </div>
 
           <!-- Acciones (visible al hover en desktop, siempre en mobile) -->
           <div
-            class="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100 lg:opacity-0"
+            class="flex w-full shrink-0 justify-end gap-1 border-t border-gray-50 pt-2 transition-opacity sm:w-auto sm:border-0 sm:pt-0 sm:opacity-0 sm:group-hover:opacity-100"
           >
             <button
               @click="openEditModal(income)"

@@ -566,11 +566,11 @@ const dueDateLabel = (dateStr: string) => {
           <div
             v-for="day in paymentPlan.cashFlowProjection"
             :key="day.date"
-            class="flex items-center gap-4 px-4 py-3"
+            class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 sm:flex-nowrap sm:gap-4"
             :class="day.balance < 0 ? 'bg-red-50/60' : ''"
           >
             <!-- Fecha + tipo -->
-            <div class="w-14 shrink-0 text-center">
+            <div class="shrink-0 sm:w-14 sm:text-center">
               <p class="text-xs font-bold text-gray-700">{{ formatDate(day.date) }}</p>
             </div>
 
@@ -589,7 +589,7 @@ const dueDateLabel = (dateStr: string) => {
             </div>
 
             <!-- Descripción -->
-            <div class="min-w-0 flex-1 text-xs text-gray-600">
+            <div class="min-w-0 basis-full text-xs text-gray-600 sm:flex-1 sm:basis-0">
               <div v-if="day.type === 'income'" class="font-medium text-emerald-700">
                 Sueldo esperado
               </div>
@@ -600,25 +600,27 @@ const dueDateLabel = (dateStr: string) => {
               </div>
             </div>
 
-            <!-- Movimiento -->
-            <div class="shrink-0 text-right">
-              <p v-if="day.income > 0" class="text-sm font-semibold text-emerald-600">
-                +{{ formatCurrency(day.income) }}
-              </p>
-              <p v-if="day.expenses > 0" class="text-sm font-semibold text-red-600">
-                -{{ formatCurrency(day.expenses) }}
-              </p>
-            </div>
+            <!-- Movimiento + saldo -->
+            <div class="flex w-full items-end justify-between gap-3 sm:contents">
+              <div class="min-w-0 sm:shrink-0 sm:text-right">
+                <p v-if="day.income > 0" class="text-sm font-semibold text-emerald-600">
+                  +{{ formatCurrency(day.income) }}
+                </p>
+                <p v-if="day.expenses > 0" class="text-sm font-semibold text-red-600">
+                  -{{ formatCurrency(day.expenses) }}
+                </p>
+              </div>
 
-            <!-- Balance resultante -->
-            <div class="w-24 shrink-0 text-right">
-              <p
-                class="text-sm font-bold"
-                :class="day.balance < 0 ? 'text-red-600' : 'text-gray-800'"
-              >
-                {{ formatCurrency(day.balance) }}
-              </p>
-              <p class="text-[10px] text-gray-400">saldo</p>
+              <!-- Balance resultante -->
+              <div class="shrink-0 text-right sm:w-24">
+                <p
+                  class="text-sm font-bold"
+                  :class="day.balance < 0 ? 'text-red-600' : 'text-gray-800'"
+                >
+                  {{ formatCurrency(day.balance) }}
+                </p>
+                <p class="text-[10px] text-gray-400">saldo</p>
+              </div>
             </div>
           </div>
         </div>

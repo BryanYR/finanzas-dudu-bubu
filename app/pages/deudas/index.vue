@@ -196,7 +196,7 @@ const filters = [
       </div>
 
       <!-- Stats 3 en fila -->
-      <div class="grid grid-cols-3 gap-3">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
           <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Deuda total</p>
           <p class="mt-1.5 text-lg font-bold text-red-500 lg:text-xl">
@@ -299,10 +299,12 @@ const filters = [
 
           <div class="p-4 lg:p-5">
             <!-- Fila 1: Nombre + estado + cuota mensual -->
-            <div class="flex items-start justify-between gap-3">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
               <div class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-2">
-                  <h3 class="text-base font-bold text-gray-900">{{ debt.name }}</h3>
+                  <h3 class="min-w-0 break-words text-base font-bold text-gray-900">
+                    {{ debt.name }}
+                  </h3>
                   <span
                     class="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
                     :class="
@@ -322,7 +324,7 @@ const filters = [
                   Pago día {{ debt.paymentDayOfMonth }}
                 </p>
               </div>
-              <div class="shrink-0 text-right">
+              <div class="flex shrink-0 items-baseline gap-2 sm:block sm:text-right">
                 <p class="text-lg font-bold text-gray-900">
                   {{ formatCurrency(debt.monthlyPayment) }}
                 </p>
@@ -331,7 +333,7 @@ const filters = [
             </div>
 
             <!-- Fila 2: Montos -->
-            <div class="mt-3 flex flex-wrap gap-4">
+            <div class="mt-3 flex flex-wrap gap-x-5 gap-y-2">
               <div>
                 <p class="text-xs text-gray-400">Pendiente</p>
                 <p

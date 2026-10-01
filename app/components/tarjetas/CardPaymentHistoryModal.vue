@@ -78,15 +78,17 @@ const totalPaid = computed(() => {
 
     <div v-else>
       <!-- Summary -->
-      <div class="mb-6 rounded-lg bg-gradient-to-r from-green-500 to-emerald-600 p-6 text-white">
+      <div
+        class="mb-6 rounded-lg bg-gradient-to-r from-green-500 to-emerald-600 p-4 text-white sm:p-6"
+      >
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm opacity-90">Total Pagado</p>
-            <p class="text-3xl font-bold">{{ formatCurrency(totalPaid) }}</p>
+            <p class="text-2xl font-bold sm:text-3xl">{{ formatCurrency(totalPaid) }}</p>
           </div>
           <div class="text-right">
             <p class="text-sm opacity-90">Número de Pagos</p>
-            <p class="text-3xl font-bold">{{ payments.length }}</p>
+            <p class="text-2xl font-bold sm:text-3xl">{{ payments.length }}</p>
           </div>
         </div>
       </div>
@@ -96,9 +98,9 @@ const totalPaid = computed(() => {
         <div
           v-for="payment in payments"
           :key="payment.id"
-          class="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md"
+          class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md"
         >
-          <div class="flex items-center gap-4">
+          <div class="flex min-w-0 items-center gap-3 sm:gap-4">
             <div class="rounded-full bg-green-100 p-1">
               <CheckCircleIcon custom-class="h-6 w-6 text-green-600" />
             </div>
