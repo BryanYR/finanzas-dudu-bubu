@@ -135,7 +135,8 @@ model CreditCard {
 model CreditCardStatement {
   id           Int       @id @default(autoincrement())
   dueDate      DateTime // Fecha de vencimiento del recibo
-  amount       Decimal   @db.Decimal(12, 2) // Monto total a pagar del recibo
+  amount       Decimal   @db.Decimal(12, 2) // Monto base del recibo (lo cargado a mano)
+  coveredUntil DateTime? // Día hasta el cual `amount` ya incluye consumos; los gastos con la tarjeta posteriores (dentro del ciclo del recibo) se suman. null = ninguno incluido
   isPaid       Boolean   @default(false)
   paidAt       DateTime?
   paidAmount   Decimal?  @db.Decimal(12, 2) // Lo que realmente se pagó

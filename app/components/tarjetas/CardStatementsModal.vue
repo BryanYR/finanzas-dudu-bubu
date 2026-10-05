@@ -23,7 +23,9 @@ const saving = ref(false)
 const error = ref('')
 const editingId = ref<number | null>(null)
 
-const form = reactive({ dueDate: '', amount: '' as number | '', notes: '' })
+const form = reactive({ dueDate: '', amount: '' as number | '', coveredUntil: '', notes: '' })
+// Valores originales al editar: si cambia el monto sin tocar "incluye hasta", se asume el total de hoy
+const original = ref<{ amount: number; coveredUntil: string } | null>(null)
 
 const localShow = computed({
   get: () => props.show,
@@ -47,8 +49,10 @@ const suggestedDueDate = () => {
 
 const resetForm = () => {
   editingId.value = null
+  original.value = null
   form.dueDate = suggestedDueDate()
   form.amount = ''
+  form.coveredUntil = dayjs().format('YYYY-MM-DD')
   form.notes = ''
   error.value = ''
 }
@@ -82,7 +86,9 @@ const startEdit = (bill: CardBill) => {
   editingId.value = bill.id
   form.dueDate = dayjs(bill.dueDate).format('YYYY-MM-DD')
   form.amount = bill.amount
+  form.coveredUntil = bill.coveredUntil ? dayjs(bill.coveredUntil).format('YYYY-MM-DD') : ''
   form.notes = bill.notes ?? ''
+  original.value = { amount: bill.amount, coveredUntil: form.coveredUntil }
   error.value = ''
 }
 
@@ -91,11 +97,22 @@ const submit = async () => {
   if (!form.dueDate) return (error.value = 'Indica la fecha de vencimiento')
   if (!form.amount || Number(form.amount) <= 0) return (error.value = 'El monto debe ser mayor a 0')
 
+  // Editar el monto sin tocar la fecha = nuevo total calculado hoy: lo posterior se suma aparte
+  let coveredUntil = form.coveredUntil
+  if (
+    original.value &&
+    Number(form.amount) !== original.value.amount &&
+    coveredUntil === original.value.coveredUntil
+  ) {
+    coveredUntil = dayjs().format('YYYY-MM-DD')
+  }
+
   saving.value = true
   error.value = ''
   const body = {
     dueDate: toIsoNoon(form.dueDate),
     amount: Number(form.amount),
+    coveredUntil: coveredUntil ? toIsoNoon(coveredUntil) : null,
     notes: form.notes || null,
   }
   try {
@@ -158,15 +175,17 @@ const inputClass =
   <UiModal v-model="localShow" :title="`Recibos - ${card?.name ?? ''}`" size="lg">
     <div class="space-y-5">
       <p class="text-xs text-gray-500">
-        Carga el monto a pagar de cada recibo (del estado de cuenta o tu cálculo). La tarjeta
-        muestra el recibo pendiente más próximo; al registrar el pago pasa al siguiente. Sin recibos
-        cargados, el monto se calcula con los gastos registrados.
+        Carga el monto a pagar de cada recibo (del estado de cuenta o tu cálculo) y hasta qué día ya
+        incluye tus consumos. Los gastos que registres con la tarjeta después de esa fecha, dentro
+        del ciclo del recibo, se suman solos al pago. La tarjeta muestra el recibo pendiente más
+        próximo; al registrar el pago pasa al siguiente. Sin recibos cargados, el monto se calcula
+        con los gastos registrados.
       </p>
 
       <!-- Formulario -->
       <form
         @submit.prevent="submit"
-        class="grid grid-cols-1 gap-3 rounded-xl bg-gray-50 p-4 ring-1 ring-gray-100 sm:grid-cols-3"
+        class="grid grid-cols-1 gap-3 rounded-xl bg-gray-50 p-4 ring-1 ring-gray-100 sm:grid-cols-2"
       >
         <div>
           <label class="block text-xs font-medium text-gray-700">Vence *</label>
@@ -185,13 +204,22 @@ const inputClass =
           />
         </div>
         <div>
+          <label class="block text-xs font-medium text-gray-700"
+            >Monto incluye consumos hasta</label
+          >
+          <input v-model="form.coveredUntil" type="date" :class="inputClass" />
+          <p class="mt-1 text-[11px] text-gray-400">
+            Vacío: se suman todos los gastos sin pagar del ciclo.
+          </p>
+        </div>
+        <div>
           <label class="block text-xs font-medium text-gray-700">Nota</label>
           <input v-model="form.notes" type="text" maxlength="500" :class="inputClass" />
         </div>
-        <div v-if="error" class="rounded-lg bg-red-50 p-2 text-xs text-red-700 sm:col-span-3">
+        <div v-if="error" class="rounded-lg bg-red-50 p-2 text-xs text-red-700 sm:col-span-2">
           {{ error }}
         </div>
-        <div class="flex justify-end gap-2 sm:col-span-3">
+        <div class="flex justify-end gap-2 sm:col-span-2">
           <UiButton v-if="editingId" type="button" variant="outline" @click="resetForm">
             Cancelar
           </UiButton>
@@ -247,6 +275,13 @@ const inputClass =
                 >
                   Vence {{ formatDate(bill.dueDate) }}
                   <span v-if="dayjs(bill.dueDate).isBefore(dayjs(), 'day')">· vencido</span>
+                </p>
+                <p class="text-xs text-gray-400">
+                  {{
+                    bill.coveredUntil
+                      ? `Incluye consumos hasta el ${formatDate(bill.coveredUntil)}`
+                      : 'Suma todos los gastos sin pagar del ciclo'
+                  }}
                 </p>
                 <p v-if="bill.notes" class="truncate text-xs text-gray-400">{{ bill.notes }}</p>
               </div>

@@ -57,6 +57,15 @@ model CreditCardStatement {
 - CMR: 05/11/2026 S/2,455.85 · 05/12/2026 S/944.42 · 05/01/2027 S/472.06
 - SIP: 15/11/2026 S/744.38 · 15/12/2026 S/466.16 · 15/01/2027 S/466.16
 
+### Consumos posteriores al recibo (`coveredUntil`, 2026-10-05)
+
+Problema: el monto del recibo era fijo, así que los gastos registrados después de cargarlo no aparecían en Planificación ni en la tarjeta (ej. S/ 620.81 de la CMR).
+
+- Se agrega `CreditCardStatement.coveredUntil` (nullable). `amount` pasa a ser el monto base y los gastos con la tarjeta, sin pagar, posteriores a `coveredUntil` y dentro del ciclo del recibo se suman: `creditCardService.computeStatementDue`.
+- Lo usan `resolveCardAmountDue` (tarjeta) y `paymentPlanService` (planificación). El modal de recibos pide la fecha y, al editar el monto sin tocarla, la fija en hoy.
+- Datos: CMR 05/11 y SIP 15/11 quedaron con `coveredUntil` = 30/09.
+- Límite: los gastos de un ciclo sin recibo cargado no se estiman, y no se sabe de gastos que no se registraron.
+
 ### Fuera de alcance
 
 - Los pagos parciales no se modelan: el recibo se marca pagado y se guarda el monto que realmente se pagó.

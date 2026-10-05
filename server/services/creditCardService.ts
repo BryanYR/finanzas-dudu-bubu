@@ -77,6 +77,74 @@ export function billingWindowForDueDate(card: CardBillingConfig, dueDate: Date):
   }
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000
+/** Día calendario (ms de medianoche UTC): las fechas guardadas usan su día UTC. */
+const utcDayOf = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+
+/** Monto que un consumo aporta a un recibo: la cuota mensual si fue en cuotas, o el total. */
+export function cardChargeOf(expense: {
+  amount: unknown
+  installments: number | null
+  installmentAmount: unknown
+}) {
+  // amount / installmentAmount vienen como Prisma.Decimal
+  if (expense.installments && expense.installments > 1) {
+    return expense.installmentAmount != null
+      ? Number(expense.installmentAmount)
+      : Number(expense.amount) / expense.installments
+  }
+  return Number(expense.amount)
+}
+
+/**
+ * Monto del recibo = `amount` (lo cargado a mano, que ya incluye los consumos hasta
+ * `coveredUntil`) + los gastos con la tarjeta, sin pagar, hechos DESPUÉS de esa fecha y
+ * dentro del ciclo de facturación del recibo. Sin `coveredUntil` no se asume ningún
+ * consumo incluido: todo gasto sin pagar del ciclo se suma.
+ * Trabaja en días UTC porque las fechas de los gastos se guardan a medianoche UTC.
+ */
+export function computeStatementDue(
+  card: CardBillingConfig,
+  statement: { dueDate: Date; amount: unknown; coveredUntil: Date | null },
+  unpaidCardExpenses: Array<{
+    date: Date
+    amount: unknown
+    installments: number | null
+    installmentAmount: unknown
+  }>
+) {
+  const due = statement.dueDate
+  const endMonthOffset = card.paymentDay > card.billingDay ? 0 : -1
+  const y = due.getUTCFullYear()
+  const m = due.getUTCMonth() + endMonthOffset
+  const cycleStart = Date.UTC(y, m - 1, card.billingDay + 1)
+  const cycleEnd = Date.UTC(y, m, card.billingDay)
+  const from = statement.coveredUntil
+    ? Math.max(cycleStart, utcDayOf(statement.coveredUntil) + DAY_MS)
+    : cycleStart
+
+  const newExpenses = unpaidCardExpenses.filter((e) => {
+    const day = utcDayOf(e.date)
+    return day >= from && day <= cycleEnd
+  })
+  const baseAmount = Number(statement.amount)
+  const newExpensesAmount = newExpenses.reduce((sum, e) => sum + cardChargeOf(e), 0)
+  return {
+    baseAmount,
+    newExpenses,
+    newExpensesAmount,
+    totalAmount: baseAmount + newExpensesAmount,
+  }
+}
+
+/** Gastos con la tarjeta aún sin pagar (de cualquier ciclo). */
+export function findUnpaidCardExpenses(cardId: number, userId: number) {
+  return prisma.expense.findMany({
+    where: { userId, creditCardId: cardId, isPaidOff: false },
+    orderBy: { date: 'asc' },
+  })
+}
+
 /** Recibo pendiente más próximo (aunque ya esté vencido), o null si no hay recibos cargados. */
 export function findNextUnpaidStatement(cardId: number, userId: number) {
   return prisma.creditCardStatement.findFirst({
@@ -112,10 +180,16 @@ export async function resolveCardAmountDue(
   const statement = await findNextUnpaidStatement(card.id, userId)
   if (statement) {
     const window = billingWindowForDueDate(card, statement.dueDate)
+    const unpaid = await findUnpaidCardExpenses(card.id, userId)
+    const due = computeStatementDue(card, statement, unpaid)
     return {
       source: 'statement' as const,
       statementId: statement.id,
-      amountDue: Number(statement.amount),
+      amountDue: due.totalAmount,
+      baseAmount: due.baseAmount,
+      newExpensesAmount: due.newExpensesAmount,
+      newExpensesCount: due.newExpenses.length,
+      coveredUntil: statement.coveredUntil,
       billingStartDate: window.start,
       billingEndDate: window.end,
       paymentDueDate: statement.dueDate,
@@ -129,6 +203,10 @@ export async function resolveCardAmountDue(
     source: 'expenses' as const,
     statementId: null,
     amountDue: usedAmount,
+    baseAmount: Number(card.carriedBalance),
+    newExpensesAmount: periodExpensesAmount,
+    newExpensesCount: expenses.length,
+    coveredUntil: null,
     ...period,
     usedAmount,
     periodExpensesAmount,

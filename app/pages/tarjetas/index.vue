@@ -409,6 +409,17 @@ const usageBarClass = (pct: number) => {
                   <p class="text-2xl font-bold text-gray-900">
                     {{ formatCurrency(getStatement(card.id).totalAmount) }}
                   </p>
+                  <p
+                    v-if="
+                      getStatement(card.id).source === 'statement' &&
+                      (getStatement(card.id).newExpensesAmount ?? 0) > 0
+                    "
+                    class="text-xs text-gray-400"
+                  >
+                    Recibo {{ formatCurrency(getStatement(card.id).baseAmount ?? 0) }} +
+                    {{ formatCurrency(getStatement(card.id).newExpensesAmount ?? 0) }} en
+                    {{ getStatement(card.id).newExpensesCount }} consumo(s) nuevo(s)
+                  </p>
                 </div>
                 <div class="text-right">
                   <p class="text-xs text-gray-400">Vence</p>

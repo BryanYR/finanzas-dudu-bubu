@@ -19,10 +19,37 @@ const editingIncome = ref<Income | null>(null)
 const filterType = ref<'all' | 'recurring' | 'one-time'>('all')
 const searchQuery = ref('')
 
-const filteredIncomes = computed(() => {
-  let list = incomes.value ?? []
-  if (filterType.value === 'recurring') list = list.filter((i) => i.isRecurring)
-  if (filterType.value === 'one-time') list = list.filter((i) => !i.isRecurring)
+// Filtros avanzados (se combinan con los pills de tipo y la búsqueda)
+const dateRange = useDateRangeFilter()
+const showAdvanced = ref(false)
+const categoryIds = ref<(number | string)[]>([])
+const frequencyFilter = ref('all')
+// v-model.number deja '' al vaciar el input; solo cuentan los valores numéricos
+const minAmount = ref<number | '' | null>(null)
+const maxAmount = ref<number | '' | null>(null)
+const isNum = (v: number | '' | null): v is number => typeof v === 'number' && !Number.isNaN(v)
+const sortBy = ref<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc' | 'category'>(
+  'date-desc'
+)
+
+const categoryOptions = computed(() =>
+  (categories.value ?? [])
+    .filter((c) => c.type === 'income')
+    .map((c) => ({ value: c.id, label: c.name, icon: c.icon }))
+)
+
+// Todo menos los pills de tipo: alimenta las tarjetas de resumen
+const scopedIncomes = computed(() => {
+  let list = (incomes.value ?? []).filter((i) => dateRange.matches(i.date))
+
+  if (categoryIds.value.length) list = list.filter((i) => categoryIds.value.includes(i.categoryId))
+  if (frequencyFilter.value !== 'all')
+    list = list.filter((i) => i.frequency === frequencyFilter.value)
+  const min = minAmount.value
+  const max = maxAmount.value
+  if (isNum(min)) list = list.filter((i) => i.amount >= min)
+  if (isNum(max)) list = list.filter((i) => i.amount <= max)
+
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.toLowerCase()
     list = list.filter(
@@ -32,7 +59,46 @@ const filteredIncomes = computed(() => {
   return list
 })
 
+const filteredIncomes = computed(() => {
+  let list = scopedIncomes.value
+  if (filterType.value === 'recurring') list = list.filter((i) => i.isRecurring)
+  if (filterType.value === 'one-time') list = list.filter((i) => !i.isRecurring)
+
+  // La API ya devuelve fecha desc; solo se reordena cuando se pide otro criterio
+  if (sortBy.value === 'date-desc') return list
+  const sorted = [...list]
+  if (sortBy.value === 'date-asc') sorted.sort((a, b) => a.date.localeCompare(b.date))
+  else if (sortBy.value === 'amount-desc') sorted.sort((a, b) => b.amount - a.amount)
+  else if (sortBy.value === 'amount-asc') sorted.sort((a, b) => a.amount - b.amount)
+  else sorted.sort((a, b) => (a.category?.name ?? '').localeCompare(b.category?.name ?? '', 'es'))
+  return sorted
+})
+
+const activeFilterCount = computed(
+  () =>
+    (dateRange.isActive.value ? 1 : 0) +
+    (categoryIds.value.length ? 1 : 0) +
+    (frequencyFilter.value !== 'all' ? 1 : 0) +
+    (isNum(minAmount.value) || isNum(maxAmount.value) ? 1 : 0)
+)
+
+const hasAnyFilter = computed(
+  () => activeFilterCount.value > 0 || filterType.value !== 'all' || !!searchQuery.value.trim()
+)
+
+const clearFilters = () => {
+  dateRange.applyPreset('all')
+  categoryIds.value = []
+  frequencyFilter.value = 'all'
+  minAmount.value = null
+  maxAmount.value = null
+  filterType.value = 'all'
+  searchQuery.value = ''
+}
+
 const totalIncomes = computed(() => filteredIncomes.value.reduce((s, i) => s + i.amount, 0))
+const oneTimeIncomes = computed(() => scopedIncomes.value.filter((i) => !i.isRecurring))
+const oneTimeTotal = computed(() => oneTimeIncomes.value.reduce((s, i) => s + i.amount, 0))
 
 const recurringMonthlyTotal = computed(() =>
   (incomes.value ?? [])
@@ -176,11 +242,9 @@ const filters = [
       <div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
         <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Únicos</p>
         <p class="mt-1.5 text-lg font-bold text-indigo-600 lg:text-xl">
-          {{ formatCurrency(totalIncomes - recurringMonthlyTotal) }}
+          {{ formatCurrency(oneTimeTotal) }}
         </p>
-        <p class="mt-0.5 text-xs text-gray-400">
-          {{ (incomes ?? []).filter((i) => !i.isRecurring).length }} registros
-        </p>
+        <p class="mt-0.5 text-xs text-gray-400">{{ oneTimeIncomes.length }} registros</p>
       </div>
     </div>
 
@@ -226,6 +290,103 @@ const filters = [
       </div>
     </div>
 
+    <!-- Fechas + filtros avanzados -->
+    <div class="space-y-3">
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <UiDateRangeFilter
+          v-model:preset="dateRange.preset.value"
+          v-model:from="dateRange.from.value"
+          v-model:to="dateRange.to.value"
+          @select-preset="dateRange.applyPreset"
+          @edit-dates="dateRange.setCustom"
+        />
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            @click="showAdvanced = !showAdvanced"
+            class="flex items-center gap-1.5 rounded-xl bg-white px-3 py-1.5 text-xs font-medium text-gray-600 shadow-sm ring-1 ring-gray-200 hover:bg-gray-50 sm:text-sm"
+          >
+            Más filtros
+            <span
+              v-if="activeFilterCount"
+              class="rounded-full bg-emerald-600 px-1.5 text-[10px] font-semibold text-white"
+              >{{ activeFilterCount }}</span
+            >
+          </button>
+          <button
+            v-if="hasAnyFilter"
+            type="button"
+            @click="clearFilters"
+            class="text-xs font-medium text-gray-500 underline-offset-2 hover:text-gray-700 hover:underline sm:text-sm"
+          >
+            Limpiar
+          </button>
+        </div>
+      </div>
+
+      <div
+        v-if="showAdvanced"
+        class="grid grid-cols-1 gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:grid-cols-2 lg:grid-cols-4"
+      >
+        <label class="block text-xs font-medium text-gray-500">
+          Categoría
+          <UiMultiSelect
+            v-model="categoryIds"
+            :options="categoryOptions"
+            placeholder="Todas"
+            class="mt-1"
+          />
+        </label>
+        <label class="block text-xs font-medium text-gray-500">
+          Frecuencia
+          <select
+            v-model="frequencyFilter"
+            class="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none focus:border-emerald-400"
+          >
+            <option value="all">Todas</option>
+            <option v-for="(label, val) in frequencyLabel" :key="val" :value="val">
+              {{ label }}
+            </option>
+          </select>
+        </label>
+        <div class="block text-xs font-medium text-gray-500">
+          Monto (S/)
+          <div class="mt-1 flex items-center gap-2">
+            <input
+              v-model.number="minAmount"
+              type="number"
+              min="0"
+              step="any"
+              placeholder="Mín"
+              class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none focus:border-emerald-400"
+            />
+            <span class="text-gray-400">–</span>
+            <input
+              v-model.number="maxAmount"
+              type="number"
+              min="0"
+              step="any"
+              placeholder="Máx"
+              class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none focus:border-emerald-400"
+            />
+          </div>
+        </div>
+        <label class="block text-xs font-medium text-gray-500">
+          Ordenar por
+          <select
+            v-model="sortBy"
+            class="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none focus:border-emerald-400"
+          >
+            <option value="date-desc">Fecha (recientes primero)</option>
+            <option value="date-asc">Fecha (antiguos primero)</option>
+            <option value="amount-desc">Monto (mayor a menor)</option>
+            <option value="amount-asc">Monto (menor a mayor)</option>
+            <option value="category">Categoría (A-Z)</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
     <!-- Loading -->
     <div v-if="pending" class="flex items-center justify-center py-16">
       <div
@@ -254,13 +415,13 @@ const filters = [
         </svg>
       </div>
       <h3 class="mt-4 text-sm font-semibold text-gray-700">
-        {{ searchQuery ? 'Sin resultados' : 'No hay ingresos aún' }}
+        {{ hasAnyFilter ? 'Sin resultados' : 'No hay ingresos aún' }}
       </h3>
       <p class="mt-1 text-sm text-gray-400">
-        {{ searchQuery ? 'Prueba con otro término de búsqueda.' : 'Registra tu primer ingreso.' }}
+        {{ hasAnyFilter ? 'Prueba con otros filtros.' : 'Registra tu primer ingreso.' }}
       </p>
       <button
-        v-if="!searchQuery"
+        v-if="!hasAnyFilter"
         @click="openCreateModal"
         class="mt-4 rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
       >

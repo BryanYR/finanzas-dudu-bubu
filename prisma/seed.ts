@@ -48,7 +48,7 @@ async function main() {
         where: {
           userId: user.id,
           name: cat.name,
-          type: 'INCOME',
+          type: 'income',
         },
       })
 
@@ -56,7 +56,7 @@ async function main() {
         await prisma.category.create({
           data: {
             name: cat.name,
-            type: 'INCOME',
+            type: 'income',
             icon: cat.icon,
             color: cat.color,
             userId: user.id,

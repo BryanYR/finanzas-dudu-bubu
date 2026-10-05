@@ -17,6 +17,7 @@ export default defineEventHandler(async (event) => {
     data: {
       dueDate: new Date(body.dueDate),
       amount: body.amount,
+      coveredUntil: body.coveredUntil ? new Date(body.coveredUntil) : null,
       isPaid: body.isPaid,
       paidAt: body.isPaid ? (body.paidAt ? new Date(body.paidAt) : new Date()) : null,
       paidAmount: body.isPaid ? (body.paidAmount ?? body.amount) : null,

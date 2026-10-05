@@ -37,6 +37,9 @@ export default defineEventHandler(async (event) => {
     data: {
       ...(body.dueDate !== undefined && { dueDate: new Date(body.dueDate) }),
       ...(body.amount !== undefined && { amount: body.amount }),
+      ...(body.coveredUntil !== undefined && {
+        coveredUntil: body.coveredUntil ? new Date(body.coveredUntil) : null,
+      }),
       ...(body.notes !== undefined && { notes: body.notes || null }),
       ...paymentData,
     },

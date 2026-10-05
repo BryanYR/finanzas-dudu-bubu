@@ -25,6 +25,11 @@ export interface CardStatement {
   totalAmount: number
   source?: 'statement' | 'expenses'
   statementId?: number | null
+  /** Con recibo cargado: totalAmount = baseAmount (recibo) + newExpensesAmount (consumos posteriores a coveredUntil) */
+  baseAmount?: number
+  newExpensesAmount?: number
+  newExpensesCount?: number
+  coveredUntil?: string | null
   /** Uso de la línea: carriedBalance + gastos del periodo (base de creditUsagePercent/availableCredit) */
   usedAmount?: number
   periodExpensesAmount: number
@@ -40,6 +45,8 @@ export interface CardBill {
   id: number
   dueDate: string
   amount: number
+  /** Día hasta el que `amount` ya incluye consumos; los posteriores se suman al pago */
+  coveredUntil: string | null
   isPaid: boolean
   paidAt: string | null
   paidAmount: number | null

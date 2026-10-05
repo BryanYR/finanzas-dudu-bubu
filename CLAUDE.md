@@ -68,7 +68,7 @@ After editing `schema.prisma`, run `npx prisma migrate dev --name <descriptive-n
 
 ### Frontend structure (`app/`)
 
-- `app/pages/<module>/index.vue` per domain module (ahorros, categorias, deudas, gastos, ingresos, planificacion, tarjetas) plus `app/pages/index.vue` (dashboard) — mirrors the sidebar menu in `app/components/utils/Sidebar.vue`.
+- `app/pages/<module>/index.vue` per domain module (ahorros, categorias, deudas, gastos, ingresos, planificacion, reportes, tarjetas) plus `app/pages/index.vue` (dashboard) — mirrors the sidebar menu in `app/components/utils/Sidebar.vue`.
 - `app/components/<module>/` holds the Vue components for each page module; `app/components/icons/<module>/` holds matching icon components; `app/components/ui/` holds shared/generic UI pieces.
 - `app/types/<module>.ts` holds the TypeScript interfaces per domain module, imported via the `#types/*` alias.
 - Data fetching from components goes through `useAuthFetch`/`useFetchAuth` (never raw `$fetch`), so 401s are handled uniformly.

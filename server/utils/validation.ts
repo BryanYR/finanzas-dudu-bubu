@@ -18,6 +18,9 @@ export function validateBody<T>(schema: z.ZodSchema<T>, data: unknown): T {
   return result.data
 }
 
+/** Igual que `validateBody`, para `getQuery(event)` (mismo error 400). */
+export const validateQuery = validateBody
+
 // ─── Helpers internos ──────────────────────────────────────────────────────
 
 // Fecha opcional: string ISO o vacío → undefined
@@ -200,6 +203,8 @@ export const CreditCardStatementSchema = z.object({
     .number('El monto debe ser un número')
     .positive('El monto debe ser positivo')
     .max(999_999_999, 'El monto es demasiado grande'),
+  // Día hasta el que `amount` ya incluye consumos con la tarjeta (los posteriores se suman)
+  coveredUntil: optionalDateNullable,
   isPaid: z.boolean().optional().default(false),
   paidAt: optionalDateNullable,
   paidAmount: z
@@ -359,4 +364,27 @@ export const BudgetCalculateSchema = z.object({
 // completada una proyección ya guardada.
 export const BudgetUpdateSchema = z.object({
   isCompleted: z.boolean({ error: 'isCompleted debe ser un booleano' }),
+})
+
+// ─── Reportes ──────────────────────────────────────────────────────────────
+
+// Día calendario en hora Lima ("YYYY-MM-DD"); vacío = no enviado
+const reportDay = z.iso
+  .date('La fecha debe tener formato YYYY-MM-DD')
+  .optional()
+  .or(z.literal('').transform(() => undefined))
+
+// Query común de los reportes. `consumo` = lo consumido (cuenta los cargos a crédito y no
+// los pagos de tarjeta, que ya están en esos cargos); `caja` = lo que salió de la cuenta
+// (no cuenta cargos a crédito, sí los pagos de tarjeta).
+export const ReportQuerySchema = z.object({
+  from: reportDay,
+  to: reportDay,
+  basis: z.enum(['consumo', 'caja']).optional().default('consumo'),
+  categoryIds: z
+    .string()
+    .regex(/^\d+(,\d+)*$/, 'categoryIds debe ser una lista de ids separada por comas')
+    .optional()
+    .or(z.literal('').transform(() => undefined))
+    .transform((s) => (s ? s.split(',').map(Number) : undefined)),
 })

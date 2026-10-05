@@ -23,6 +23,22 @@ const skipExpense = ref<Expense | null>(null)
 const filterType = ref('all')
 const searchQuery = ref('')
 
+// Filtros avanzados (se combinan con los pills de tipo/método y la búsqueda)
+const dateRange = useDateRangeFilter()
+const showAdvanced = ref(false)
+const categoryIds = ref<(number | string)[]>([])
+const cardFilter = ref<'all' | 'none' | number>('all')
+const installmentsFilter = ref<'all' | 'installments' | 'single'>('all')
+const paidFilter = ref<'all' | 'pending' | 'paid'>('all')
+const frequencyFilter = ref('all')
+// v-model.number deja '' al vaciar el input; solo cuentan los valores numéricos
+const minAmount = ref<number | '' | null>(null)
+const maxAmount = ref<number | '' | null>(null)
+const isNum = (v: number | '' | null): v is number => typeof v === 'number' && !Number.isNaN(v)
+const sortBy = ref<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc' | 'category'>(
+  'date-desc'
+)
+
 const fetchAll = async () => {
   loading.value = true
   try {
@@ -43,8 +59,75 @@ const fetchAll = async () => {
 
 onMounted(() => fetchAll())
 
+// Todo menos los pills de tipo/método: alimenta las tarjetas de resumen para que
+// "Efectivo" y "Crédito" respondan al rango de fechas, categoría, etc.
+const scopedExpenses = computed(() => {
+  let list = expenses.value.filter((e) => dateRange.matches(e.date))
+
+  if (categoryIds.value.length) list = list.filter((e) => categoryIds.value.includes(e.categoryId))
+  if (cardFilter.value === 'none') list = list.filter((e) => !e.creditCardId)
+  else if (cardFilter.value !== 'all')
+    list = list.filter((e) => e.creditCardId === cardFilter.value)
+  if (installmentsFilter.value === 'installments')
+    list = list.filter((e) => (e.installments ?? 0) > 1)
+  else if (installmentsFilter.value === 'single')
+    list = list.filter((e) => !e.installments || e.installments <= 1)
+  if (paidFilter.value !== 'all')
+    list = list.filter(
+      (e) => e.paymentMethod === 'credit' && !!e.isPaidOff === (paidFilter.value === 'paid')
+    )
+  if (frequencyFilter.value !== 'all')
+    list = list.filter((e) => e.frequency === frequencyFilter.value)
+  const min = minAmount.value
+  const max = maxAmount.value
+  if (isNum(min)) list = list.filter((e) => e.amount >= min)
+  if (isNum(max)) list = list.filter((e) => e.amount <= max)
+
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.toLowerCase()
+    list = list.filter(
+      (e) => e.description.toLowerCase().includes(q) || e.category?.name.toLowerCase().includes(q)
+    )
+  }
+  return list
+})
+
+const activeFilterCount = computed(
+  () =>
+    (dateRange.isActive.value ? 1 : 0) +
+    (categoryIds.value.length ? 1 : 0) +
+    (cardFilter.value !== 'all' ? 1 : 0) +
+    (installmentsFilter.value !== 'all' ? 1 : 0) +
+    (paidFilter.value !== 'all' ? 1 : 0) +
+    (frequencyFilter.value !== 'all' ? 1 : 0) +
+    (isNum(minAmount.value) || isNum(maxAmount.value) ? 1 : 0)
+)
+
+const clearFilters = () => {
+  dateRange.applyPreset('all')
+  categoryIds.value = []
+  cardFilter.value = 'all'
+  installmentsFilter.value = 'all'
+  paidFilter.value = 'all'
+  frequencyFilter.value = 'all'
+  minAmount.value = null
+  maxAmount.value = null
+  filterType.value = 'all'
+  searchQuery.value = ''
+}
+
+const hasAnyFilter = computed(
+  () => activeFilterCount.value > 0 || filterType.value !== 'all' || !!searchQuery.value.trim()
+)
+
+const categoryOptions = computed(() =>
+  categories.value
+    .filter((c) => c.type === 'expense')
+    .map((c) => ({ value: c.id, label: c.name, icon: c.icon }))
+)
+
 const byMethod = computed(() =>
-  expenses.value.reduce(
+  scopedExpenses.value.reduce(
     (acc, e) => {
       acc[e.paymentMethod] = (acc[e.paymentMethod] || 0) + e.amount
       return acc
@@ -78,19 +161,20 @@ const recurringTotal = computed(() =>
 )
 
 const filteredExpenses = computed(() => {
-  let list = expenses.value
+  let list = scopedExpenses.value
   if (filterType.value === 'recurring') list = list.filter((e) => e.isRecurring)
   else if (filterType.value === 'one-time') list = list.filter((e) => !e.isRecurring)
   else if (['cash', 'debit', 'credit'].includes(filterType.value))
     list = list.filter((e) => e.paymentMethod === filterType.value)
 
-  if (searchQuery.value.trim()) {
-    const q = searchQuery.value.toLowerCase()
-    list = list.filter(
-      (e) => e.description.toLowerCase().includes(q) || e.category?.name.toLowerCase().includes(q)
-    )
-  }
-  return list
+  // La API ya devuelve fecha desc; solo se reordena cuando se pide otro criterio
+  if (sortBy.value === 'date-desc') return list
+  const sorted = [...list]
+  if (sortBy.value === 'date-asc') sorted.sort((a, b) => a.date.localeCompare(b.date))
+  else if (sortBy.value === 'amount-desc') sorted.sort((a, b) => b.amount - a.amount)
+  else if (sortBy.value === 'amount-asc') sorted.sort((a, b) => a.amount - b.amount)
+  else sorted.sort((a, b) => (a.category?.name ?? '').localeCompare(b.category?.name ?? '', 'es'))
+  return sorted
 })
 
 const totalFiltered = computed(() => filteredExpenses.value.reduce((s, e) => s + e.amount, 0))
@@ -275,6 +359,138 @@ const methodFilters = [
       </div>
     </div>
 
+    <!-- Fechas + filtros avanzados -->
+    <div class="space-y-3">
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <UiDateRangeFilter
+          v-model:preset="dateRange.preset.value"
+          v-model:from="dateRange.from.value"
+          v-model:to="dateRange.to.value"
+          @select-preset="dateRange.applyPreset"
+          @edit-dates="dateRange.setCustom"
+        />
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            @click="showAdvanced = !showAdvanced"
+            class="flex items-center gap-1.5 rounded-xl bg-white px-3 py-1.5 text-xs font-medium text-gray-600 shadow-sm ring-1 ring-gray-200 hover:bg-gray-50 sm:text-sm"
+          >
+            Más filtros
+            <span
+              v-if="activeFilterCount"
+              class="rounded-full bg-red-500 px-1.5 text-[10px] font-semibold text-white"
+              >{{ activeFilterCount }}</span
+            >
+          </button>
+          <button
+            v-if="hasAnyFilter"
+            type="button"
+            @click="clearFilters"
+            class="text-xs font-medium text-gray-500 underline-offset-2 hover:text-gray-700 hover:underline sm:text-sm"
+          >
+            Limpiar
+          </button>
+        </div>
+      </div>
+
+      <div
+        v-if="showAdvanced"
+        class="grid grid-cols-1 gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:grid-cols-2 lg:grid-cols-3"
+      >
+        <label class="block text-xs font-medium text-gray-500">
+          Categoría
+          <UiMultiSelect
+            v-model="categoryIds"
+            :options="categoryOptions"
+            placeholder="Todas"
+            class="mt-1"
+          />
+        </label>
+        <label class="block text-xs font-medium text-gray-500">
+          Tarjeta
+          <select
+            v-model="cardFilter"
+            class="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none focus:border-red-400"
+          >
+            <option value="all">Todas</option>
+            <option value="none">Sin tarjeta</option>
+            <option v-for="c in creditCards" :key="c.id" :value="c.id">
+              {{ c.name }} ••••{{ c.lastDigits }}
+            </option>
+          </select>
+        </label>
+        <label class="block text-xs font-medium text-gray-500">
+          Estado de pago (tarjeta)
+          <select
+            v-model="paidFilter"
+            class="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none focus:border-red-400"
+          >
+            <option value="all">Todos</option>
+            <option value="pending">Pendientes de pago</option>
+            <option value="paid">Ya pagados</option>
+          </select>
+        </label>
+        <label class="block text-xs font-medium text-gray-500">
+          Cuotas
+          <select
+            v-model="installmentsFilter"
+            class="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none focus:border-red-400"
+          >
+            <option value="all">Todos</option>
+            <option value="installments">En cuotas</option>
+            <option value="single">Pago único</option>
+          </select>
+        </label>
+        <label class="block text-xs font-medium text-gray-500">
+          Frecuencia
+          <select
+            v-model="frequencyFilter"
+            class="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none focus:border-red-400"
+          >
+            <option value="all">Todas</option>
+            <option v-for="(label, val) in frequencyLabel" :key="val" :value="val">
+              {{ label }}
+            </option>
+          </select>
+        </label>
+        <div class="block text-xs font-medium text-gray-500">
+          Monto (S/)
+          <div class="mt-1 flex items-center gap-2">
+            <input
+              v-model.number="minAmount"
+              type="number"
+              min="0"
+              step="any"
+              placeholder="Mín"
+              class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none focus:border-red-400"
+            />
+            <span class="text-gray-400">–</span>
+            <input
+              v-model.number="maxAmount"
+              type="number"
+              min="0"
+              step="any"
+              placeholder="Máx"
+              class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none focus:border-red-400"
+            />
+          </div>
+        </div>
+        <label class="block text-xs font-medium text-gray-500">
+          Ordenar por
+          <select
+            v-model="sortBy"
+            class="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none focus:border-red-400"
+          >
+            <option value="date-desc">Fecha (recientes primero)</option>
+            <option value="date-asc">Fecha (antiguos primero)</option>
+            <option value="amount-desc">Monto (mayor a menor)</option>
+            <option value="amount-asc">Monto (menor a mayor)</option>
+            <option value="category">Categoría (A-Z)</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
     <!-- Loading -->
     <div v-if="loading" class="flex items-center justify-center py-16">
       <div
@@ -298,13 +514,13 @@ const methodFilters = [
         </svg>
       </div>
       <h3 class="mt-4 text-sm font-semibold text-gray-700">
-        {{ searchQuery ? 'Sin resultados' : 'No hay gastos aún' }}
+        {{ hasAnyFilter ? 'Sin resultados' : 'No hay gastos aún' }}
       </h3>
       <p class="mt-1 text-sm text-gray-400">
-        {{ searchQuery ? 'Prueba con otro término.' : 'Registra tu primer gasto.' }}
+        {{ hasAnyFilter ? 'Prueba con otros filtros.' : 'Registra tu primer gasto.' }}
       </p>
       <button
-        v-if="!searchQuery"
+        v-if="!hasAnyFilter"
         @click="handleCreate"
         class="mt-4 rounded-xl bg-red-500 px-5 py-2 text-sm font-semibold text-white hover:bg-red-600"
       >

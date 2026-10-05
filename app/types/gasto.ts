@@ -13,6 +13,7 @@ export interface Expense {
   notes?: string
   categoryId: number
   creditCardId?: number
+  isPaidOff?: boolean
   installments?: number
   installmentAmount?: number
   totalWithInterest?: number

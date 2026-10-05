@@ -239,10 +239,10 @@ indican explícitamente.
 
 **GET `/api/credit-cards/:id/payment-history`**: devuelve `{ card: { id, name, bank, lastDigits }, payments: [...] }`, donde `payments` son los `Expense` cuya `description` empieza con `'Pago Tarjeta'` para esa tarjeta, con su `category` embebida.
 
-**GET `/api/credit-cards/:id/statement`** (archivo `statement.get.ts`, lógica en `creditCardService.resolveCardAmountDue`): devuelve `{ card, billingPeriod: { startDate, endDate, paymentDueDate }, statement: { totalAmount, source, statementId, usedAmount, periodExpensesAmount, carriedBalance, transactionCount, creditUsagePercent, availableCredit, billingEndDate, paymentDueDate }, expenses }`.
+**GET `/api/credit-cards/:id/statement`** (archivo `statement.get.ts`, lógica en `creditCardService.resolveCardAmountDue`): devuelve `{ card, billingPeriod: { startDate, endDate, paymentDueDate }, statement: { totalAmount, source, statementId, baseAmount, newExpensesAmount, newExpensesCount, coveredUntil, usedAmount, periodExpensesAmount, carriedBalance, transactionCount, creditUsagePercent, availableCredit, billingEndDate, paymentDueDate }, expenses }`.
 
 - `totalAmount` (monto a pagar) y `paymentDueDate`:
-  - `source: 'statement'`: si hay un `CreditCardStatement` con `isPaid: false`, se usa el de `dueDate` más próximo (aunque ya esté vencido), con su `amount` y `dueDate`. `billingPeriod` es el ciclo que vence en esa fecha.
+  - `source: 'statement'`: si hay un `CreditCardStatement` con `isPaid: false`, se usa el de `dueDate` más próximo (aunque ya esté vencido), con su `dueDate`. `totalAmount = baseAmount + newExpensesAmount`: `baseAmount` es el `amount` cargado y `newExpensesAmount` suma los gastos con la tarjeta, sin pagar, posteriores a `coveredUntil` y dentro del ciclo de ese recibo (`creditCardService.computeStatementDue`; una compra en cuotas aporta su cuota mensual). `billingPeriod` es el ciclo que vence en esa fecha.
   - `source: 'expenses'` (sin recibos cargados): `carriedBalance` + gastos `isPaidOff: false` del período activo (el cerrado no pagado si existe, si no el en curso), con vencimiento `paymentDay` respecto al fin del período.
 - `usedAmount` = `carriedBalance` + gastos no pagados del período activo, **siempre**; es la base de `creditUsagePercent` y `availableCredit` (uso de la línea, no monto del recibo).
 - `expenses` son los gastos no pagados del período activo.
@@ -255,11 +255,13 @@ indican explícitamente.
 {
   "dueDate": "2026-11-05T17:00:00.000Z",
   "amount": 2455.85,
+  "coveredUntil": "2026-09-30T17:00:00.000Z",
   "notes": "Recibo corte 10/10",
   "isPaid": false
 }
 ```
 
+- `coveredUntil` opcional: día hasta el cual `amount` ya incluye consumos con la tarjeta. Los gastos posteriores (dentro del ciclo del recibo) se suman al monto a pagar. `null`: no se asume ningún consumo incluido, así que se suman todos los gastos sin pagar del ciclo. Al pasar un total nuevo hay que mandar `coveredUntil` = hoy (el modal de recibos lo hace solo).
 - `isPaid` opcional (default `false`); si viene `true` sin `paidAt`/`paidAmount`, se asume pago completo hoy.
 
 **PUT `/api/credit-cards/:id/statements/:statementId`** (`CreditCardStatementUpdateSchema`, todos opcionales): `isPaid: true` completa `paidAt`/`paidAmount` si no se envían; `isPaid: false` los limpia. Omitir `isPaid` no cambia el estado de pago.
@@ -500,6 +502,32 @@ Sin query params. Calcula, para el mes calendario actual (`startOfMonth`–`endO
 
 ---
 
+### 📊 Reportes (`/api/reports`)
+
+| Método | Endpoint                            | Descripción                                                          |
+| ------ | ----------------------------------- | -------------------------------------------------------------------- |
+| GET    | `/api/reports/monthly-summary`      | Ingresos, gastos (fijos/variables), pagos de deuda y ahorro por mes  |
+| GET    | `/api/reports/expenses-by-category` | Gasto por categoría con % del total y variación vs. período anterior |
+
+Query común (`ReportQuerySchema`; error 400 si es inválida). Lógica en `server/services/reportService.ts`:
+
+- `from`, `to` (opcionales, `YYYY-MM-DD` en hora Lima, ambos inclusive). `to` por defecto = hoy; `from` por defecto = mes del primer registro, con tope de 36 meses. Rango invertido o de más de 36 meses → 400.
+- `basis` (`consumo` por defecto | `caja`). `consumo` cuenta los cargos con tarjeta de crédito y **excluye** los pagos de tarjeta (gastos de débito con descripción "Pago Tarjeta …", que ya están en esos cargos); `caja` **excluye** los gastos `paymentMethod: credit` e incluye los pagos de tarjeta.
+- `categoryIds` (solo `expenses-by-category`): ids separados por coma.
+
+Cálculo de gastos (compartido por ambos reportes):
+
+- Gastos no recurrentes: una línea por fila, en el mes Lima de su fecha.
+- Gastos recurrentes: son una sola fila plantilla, así que se expanden por mes con `countOccurrencesInRange` desde su fecha de inicio, sin `skippedMonths`; en el mes en curso solo cuentan hasta hoy. Si el mes ya tiene un gasto registrado a mano con la misma descripción (o misma categoría y monto), ese gasto reemplaza a la ocurrencia (misma regla que `payment-plan`). Un recurrente sin `frequency` se trata como gasto puntual.
+- Los ingresos no se expanden: se suman las filas por fecha (los recurrentes se materializan con `generate-recurring`).
+- Las sumas se hacen en `Decimal` y se redondean a 2 decimales al responder.
+
+**GET `/api/reports/monthly-summary`** → `{ from, to, basis, months[], totals, monthlyAverage }`. Cada mes: `month` (`YYYY-MM`), `isPartial` (mes en curso), `income`, `fixedExpenses`, `variableExpenses`, `expenses`, `debtPayments` (`DebtPayment.amount`, no son `Expense`), `net = income − expenses − debtPayments`, `savingsRate = net / income` como fracción (`null` si no hubo ingresos). Incluye todos los meses del rango, también los vacíos.
+
+**GET `/api/reports/expenses-by-category`** → `{ from, to, basis, total, previous: { from, to, total }, change, categories[] }`. `previous` es el rango inmediatamente anterior y de igual duración. Cada categoría: `categoryId`, `name`, `icon`, `color`, `total`, `count` (gastos u ocurrencias), `percentage` (0-100), `previousTotal`, `change` (% vs. período anterior; `null` si no tuvo gasto antes). Ordenadas por `total` descendente; solo categorías con gasto en el período.
+
+---
+
 ### 🧭 Plan de Pagos (`/api/payment-plan`)
 
 | Método | Endpoint                        | Descripción                                                                |
@@ -511,7 +539,7 @@ Sin query params. Agrupa todo por **ciclo de sueldo** `[sueldo k, sueldo k+1)` e
 - **Ancla del ciclo**: la plantilla de ingreso recurrente mensual de mayor monto. El ciclo actual empieza el día del último sueldo recibido de esa plantilla (la plantilla misma o un ingreso auto-generado con `notes` "…recurrente #<id>"); si no hay uno en los últimos 40 días, se usa el día teórico. Sin ingresos recurrentes, el ciclo es el mes calendario.
 - **Ciclo actual** (`cycles.current`): `income` = todos los ingresos desde el inicio del ciclo hasta hoy (incluye préstamos recibidos); `spent` = gastos sin `creditCardId` + `DebtPayment` del mismo rango; `available = income − spent`; obligaciones = lo no pagado con vencimiento antes del próximo sueldo (incluye vencidas).
 - **Próximo ciclo** (`cycles.next`): `income` = suma de plantillas mensuales; obligaciones con vencimiento entre el próximo sueldo y el siguiente; `carryOver` = `result` del ciclo actual; `result = carryOver + income − obligationsTotal`; `resultWithoutCarry = income − obligationsTotal`.
-- **Obligaciones**: todas las cuotas `pending`/`overdue` de `DebtInstallment` dentro del horizonte; recibos `CreditCardStatement` no pagados (si una tarjeta no tiene ninguno pendiente, estimación por gastos del periodo activo); ocurrencias de gastos recurrentes **sin tarjeta** posteriores a la fecha de la plantilla, sin meses omitidos (`skippedMonths`) y sin un gasto ya registrado ese mes con la misma descripción (o misma categoría y monto).
+- **Obligaciones**: todas las cuotas `pending`/`overdue` de `DebtInstallment` dentro del horizonte; recibos `CreditCardStatement` no pagados, con monto = `amount` + consumos posteriores a `coveredUntil` dentro de su ciclo (si una tarjeta no tiene ninguno pendiente, estimación por gastos del periodo activo); ocurrencias de gastos recurrentes **sin tarjeta** posteriores a la fecha de la plantilla, sin meses omitidos (`skippedMonths`) y sin un gasto ya registrado ese mes con la misma descripción (o misma categoría y monto).
 - Cada sugerencia lleva `cycle: 'current' | 'next'`, `isOverdue`, `priority` (`urgent | high | medium | low` por días al vencimiento; deudas `> 15%` suben a `high`) y `suggestedPaymentDate` = vencimiento − 2 días (1 para gastos fijos), nunca antes de hoy ni antes del sueldo que la financia. Orden: ciclo, prioridad, fecha.
 - `status` por ciclo (`healthy | tight | deficit`): `result > colchón` (10% del sueldo esperado) / `≥ 0` / `< 0`.
 - `cashFlowProjection`: día a día desde hoy hasta el fin del próximo ciclo, partiendo de `cycles.current.available`, con el sueldo esperado en el inicio del próximo ciclo.

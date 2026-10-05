@@ -42,6 +42,11 @@ export default defineEventHandler(async (event) => {
       totalAmount: due.amountDue,
       source: due.source,
       statementId: due.statementId,
+      // totalAmount = baseAmount (recibo cargado) + newExpensesAmount (consumos posteriores a coveredUntil)
+      baseAmount: due.baseAmount,
+      newExpensesAmount: due.newExpensesAmount,
+      newExpensesCount: due.newExpensesCount,
+      coveredUntil: due.coveredUntil?.toISOString() ?? null,
       usedAmount: due.usedAmount,
       periodExpensesAmount: due.periodExpensesAmount,
       carriedBalance,

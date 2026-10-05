@@ -1,5 +1,10 @@
 import { prisma } from '@server/utils/db'
-import { resolveActiveBillingPeriod } from './creditCardService'
+import {
+  cardChargeOf,
+  computeStatementDue,
+  findUnpaidCardExpenses,
+  resolveActiveBillingPeriod,
+} from './creditCardService'
 import { isMonthSkipped } from '@server/utils/frequency'
 import type {
   PaymentSuggestion,
@@ -246,16 +251,27 @@ export async function getPaymentSuggestions(userId: number) {
 
   // 3b. Tarjetas: recibos cargados; si una tarjeta no tiene ninguno pendiente, estimación por gastos
   const cardsWithStatements = new Set(statements.map((s) => s.creditCardId))
+  // Monto del recibo = lo cargado + consumos con la tarjeta posteriores a `coveredUntil`
+  // dentro del ciclo del recibo (ver computeStatementDue).
+  const unpaidByCard = new Map<number, Awaited<ReturnType<typeof findUnpaidCardExpenses>>>()
+  for (const cardId of cardsWithStatements) {
+    unpaidByCard.set(cardId, await findUnpaidCardExpenses(cardId, userId))
+  }
   for (const st of statements) {
+    const due = computeStatementDue(st.creditCard, st, unpaidByCard.get(st.creditCardId) ?? [])
+    const extra = due.newExpensesAmount
     pushSuggestion({
       id: `card-${st.creditCardId}-statement-${st.id}`,
       type: 'creditCard',
       name: `${st.creditCard.name} - ${st.creditCard.bank}`,
-      amount: Number(st.amount),
+      amount: due.totalAmount,
       dueDay: dayOf(st.dueDate),
-      reason: 'Recibo de tarjeta de crédito',
+      reason:
+        extra > 0
+          ? `Recibo de tarjeta (${formatPEN(due.baseAmount)} + ${formatPEN(extra)} en ${due.newExpenses.length} consumo(s) nuevo(s))`
+          : 'Recibo de tarjeta de crédito',
       interestRate: st.creditCard.interestRate ?? undefined,
-      remainingBalance: Number(st.amount),
+      remainingBalance: due.totalAmount,
     })
   }
   for (const card of creditCards.filter((c) => !cardsWithStatements.has(c.id))) {
@@ -269,17 +285,7 @@ export async function getPaymentSuggestions(userId: number) {
       },
     })
     // En compras en cuotas se usa la cuota mensual real (installmentAmount) si existe.
-    const totalAmount = expenses.reduce((sum, e) => {
-      if (e.installments && e.installments > 1) {
-        return (
-          sum +
-          (e.installmentAmount != null
-            ? Number(e.installmentAmount)
-            : Number(e.amount) / e.installments)
-        )
-      }
-      return sum + Number(e.amount)
-    }, 0)
+    const totalAmount = expenses.reduce((sum, e) => sum + cardChargeOf(e), 0)
     if (totalAmount === 0) continue
     pushSuggestion({
       id: `card-${card.id}`,

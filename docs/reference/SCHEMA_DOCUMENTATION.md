@@ -63,8 +63,9 @@ Categorización de ingresos y gastos, con icono/color para la UI.
 
 ### 5b. `CreditCardStatement`
 
-- Un recibo por vencimiento: `dueDate`, `amount` (monto total a pagar del recibo), `isPaid`, `paidAt?`, `paidAmount?` (lo realmente pagado), `notes?`.
+- Un recibo por vencimiento: `dueDate`, `amount` (monto base del recibo, lo cargado a mano), `coveredUntil?` (día hasta el que `amount` ya incluye consumos), `isPaid`, `paidAt?`, `paidAmount?` (lo realmente pagado), `notes?`.
 - Existe porque la app no conoce los cronogramas de cuotas de las tarjetas: el monto de cada recibo lo carga el usuario (estado de cuenta o cálculo propio). El recibo pendiente de `dueDate` más próximo es el "monto a pagar" que muestra la tarjeta; `pay.post.ts` lo marca pagado y la tarjeta pasa al siguiente.
+- Monto a pagar real = `amount` + gastos con la tarjeta (`Expense.creditCardId`, `isPaidOff: false`) fechados después de `coveredUntil` y dentro del ciclo de facturación del recibo (derivado de `billingDay`/`paymentDay` y `dueDate`). Así funciona tanto cargando un total calculado (se actualiza `amount` y `coveredUntil` = hoy) como registrando gasto a gasto. `coveredUntil = null` no asume consumos incluidos.
 - Pagos parciales no modelados: el recibo se marca pagado con el `paidAmount` real.
 - `creditCardId` → `CreditCard` y `userId` → `User`, ambos `onDelete: Cascade`.
 - Índices: `@@index([creditCardId, isPaid, dueDate])`, `@@index([userId])`.
