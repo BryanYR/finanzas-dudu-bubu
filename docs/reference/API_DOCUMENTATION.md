@@ -184,19 +184,23 @@ indican explícitamente.
 
 ### 💳 Tarjetas de Crédito (`/api/credit-cards`)
 
-| Método | Endpoint                                | Descripción                                          |
-| ------ | --------------------------------------- | ---------------------------------------------------- |
-| GET    | `/api/credit-cards`                     | Listar tarjetas del usuario                          |
-| POST   | `/api/credit-cards`                     | Crear nueva tarjeta                                  |
-| PUT    | `/api/credit-cards/:id`                 | Actualizar tarjeta                                   |
-| DELETE | `/api/credit-cards/:id`                 | Eliminar tarjeta                                     |
-| POST   | `/api/credit-cards/:id/pay`             | Registrar el pago del período de facturación cerrado |
-| GET    | `/api/credit-cards/:id/payment-history` | Historial de pagos registrados de la tarjeta         |
-| GET    | `/api/credit-cards/:id/statement`       | Monto a pagar, vencimiento y uso de la línea         |
-| GET    | `/api/credit-cards/:id/statements`      | Listar recibos mensuales (`CreditCardStatement`)     |
-| POST   | `/api/credit-cards/:id/statements`      | Cargar un recibo (vencimiento + monto a pagar)       |
-| PUT    | `/api/credit-cards/:id/statements/:sid` | Editar recibo / marcar pagado o pendiente            |
-| DELETE | `/api/credit-cards/:id/statements/:sid` | Eliminar recibo                                      |
+| Método | Endpoint                                          | Descripción                                          |
+| ------ | ------------------------------------------------- | ---------------------------------------------------- |
+| GET    | `/api/credit-cards`                               | Listar tarjetas del usuario                          |
+| POST   | `/api/credit-cards`                               | Crear nueva tarjeta                                  |
+| PUT    | `/api/credit-cards/:id`                           | Actualizar tarjeta                                   |
+| DELETE | `/api/credit-cards/:id`                           | Eliminar tarjeta                                     |
+| POST   | `/api/credit-cards/:id/pay`                       | Registrar el pago del período de facturación cerrado |
+| GET    | `/api/credit-cards/:id/payment-history`           | Historial de pagos registrados de la tarjeta         |
+| GET    | `/api/credit-cards/:id/statement`                 | Monto a pagar, vencimiento y uso de la línea         |
+| GET    | `/api/credit-cards/:id/statements`                | Listar recibos mensuales (`CreditCardStatement`)     |
+| POST   | `/api/credit-cards/:id/statements`                | Cargar un recibo (vencimiento + monto a pagar)       |
+| PUT    | `/api/credit-cards/:id/statements/:sid`           | Editar recibo / marcar pagado o pendiente            |
+| DELETE | `/api/credit-cards/:id/statements/:sid`           | Eliminar recibo                                      |
+| GET    | `/api/credit-cards/:id/installment-plans`         | Planes de cuotas de la tarjeta + proyección mensual  |
+| POST   | `/api/credit-cards/:id/installment-plans`         | Crear un plan de cuotas                              |
+| PUT    | `/api/credit-cards/:id/installment-plans/:planId` | Editar un plan de cuotas                             |
+| DELETE | `/api/credit-cards/:id/installment-plans/:planId` | Eliminar un plan de cuotas                           |
 
 **Body para POST/PUT** (`CreditCardSchema` / `CreditCardUpdateSchema` = `.partial()`):
 
@@ -267,6 +271,73 @@ indican explícitamente.
 **PUT `/api/credit-cards/:id/statements/:statementId`** (`CreditCardStatementUpdateSchema`, todos opcionales): `isPaid: true` completa `paidAt`/`paidAmount` si no se envían; `isPaid: false` los limpia. Omitir `isPaid` no cambia el estado de pago.
 
 **DELETE `/api/credit-cards/:id/statements/:statementId`**: `{ success: true }`, `404` si el recibo no es de esa tarjeta/usuario.
+
+**GET `/api/credit-cards/:id/installment-plans`** (lógica en `server/services/cardInstallmentPlanService.ts`; `404` si la tarjeta no es del usuario). Devuelve `{ plans, projection }`, montos como `number` (redondeados a 2 decimales):
+
+```json
+{
+  "plans": [
+    {
+      "id": 1,
+      "description": "Falabella.com 14/06",
+      "totalInstallments": 18,
+      "installmentAmount": 105.5,
+      "firstDueDate": "2026-08-05T17:00:00.000Z",
+      "principal": 1899,
+      "interestRate": null,
+      "notes": null,
+      "isActive": true,
+      "creditCardId": 1,
+      "currentInstallment": 3,
+      "remainingInstallments": 16,
+      "lastDueDate": "2028-01-05T17:00:00.000Z",
+      "remainingAmount": 1688
+    }
+  ],
+  "projection": [
+    {
+      "month": "2026-11",
+      "dueDate": "2026-11-05T17:00:00.000Z",
+      "total": 944.42,
+      "items": [
+        {
+          "planId": 1,
+          "description": "Falabella.com 14/06",
+          "installmentNumber": 4,
+          "totalInstallments": 18,
+          "amount": 105.5
+        }
+      ],
+      "statementAmount": 2455.85
+    }
+  ]
+}
+```
+
+- La cuota N vence en `firstDueDate + (N-1)` meses (mismo día, acotado a fin de mes). El "próximo recibo" es el próximo `paymentDay` de la tarjeta en hora Lima; **el día de hoy cuenta** como próximo.
+- `plans` incluye todos los planes de la tarjeta (también los inactivos), ordenados por `firstDueDate`. `currentInstallment` es la cuota que vence en el próximo recibo (acotada a `1..totalInstallments`); `remainingInstallments` cuenta esa cuota y es `0` si el plan ya terminó; `remainingAmount = installmentAmount * remainingInstallments`.
+- `projection` solo considera planes `isActive`: un elemento por mes de vencimiento (sin huecos) desde el próximo recibo hasta la última cuota; `[]` si no hay planes activos. `dueDate` usa el `paymentDay` de la tarjeta a mediodía Lima (17:00Z). `statementAmount` es el `amount` del `CreditCardStatement` de la tarjeta con vencimiento en ese mes (pagado o no; no suma consumos posteriores a `coveredUntil`), o `null`. Incluye consumos al contado y seguros que no son cuotas, por eso puede ser mayor que `total`.
+
+**POST `/api/credit-cards/:id/installment-plans`** (`CardInstallmentPlanSchema`): responde con el plan creado.
+
+```json
+{
+  "description": "Pagoefectivo 28/07",
+  "totalInstallments": 4,
+  "installmentAmount": 476.86,
+  "firstDueDate": "2026-09-05T17:00:00.000Z",
+  "principal": 1700,
+  "interestRate": 74.92,
+  "notes": "opcional",
+  "isActive": true
+}
+```
+
+- `principal`, `interestRate` (TEA %), `notes` son opcionales/nullable e informativos; `isActive` default `true`. `firstDueDate` es el vencimiento del recibo que trae la cuota 1 (datetime ISO con offset; convención: mediodía Lima).
+
+**PUT `/api/credit-cards/:id/installment-plans/:planId`** (`CardInstallmentPlanUpdateSchema`, todos opcionales): omitir `isActive` no cambia el estado; `principal`/`interestRate`/`notes` en `null` los limpian. `404` si el plan no es de esa tarjeta/usuario.
+
+**DELETE `/api/credit-cards/:id/installment-plans/:planId`**: `{ success: true }`, `404` si el plan no es de esa tarjeta/usuario.
 
 ---
 

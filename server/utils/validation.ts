@@ -220,6 +220,50 @@ export const CreditCardStatementUpdateSchema = CreditCardStatementSchema.extend(
   isPaid: z.boolean().optional(),
 }).partial()
 
+// Plan de cuotas en curso de una tarjeta (compra en cuotas, traslado de saldo, conversión).
+// firstDueDate = vencimiento del recibo que trae la cuota 1.
+export const CardInstallmentPlanSchema = z.object({
+  description: z
+    .string()
+    .trim()
+    .min(1, 'La descripción es requerida')
+    .max(200, 'La descripción es demasiado larga'),
+  totalInstallments: z
+    .number('El número de cuotas debe ser un número')
+    .int('El número de cuotas debe ser entero')
+    .min(1, 'Debe haber al menos 1 cuota')
+    .max(120, 'El número de cuotas es demasiado grande'),
+  installmentAmount: z
+    .number('El monto de la cuota debe ser un número')
+    .positive('El monto de la cuota debe ser positivo')
+    .max(999_999_999, 'El monto es demasiado grande'),
+  firstDueDate: z.iso.datetime({
+    offset: true,
+    message: 'La fecha de la primera cuota es inválida',
+  }),
+  // Monto financiado (informativo)
+  principal: z
+    .number('El monto financiado debe ser un número')
+    .positive('El monto financiado debe ser positivo')
+    .max(999_999_999, 'El monto es demasiado grande')
+    .optional()
+    .nullable(),
+  // TEA en % (informativo)
+  interestRate: z
+    .number('La tasa debe ser un número')
+    .min(0, 'La tasa no puede ser negativa')
+    .max(1000, 'La tasa es demasiado alta')
+    .optional()
+    .nullable(),
+  notes: z.string().trim().max(500, 'Las notas son demasiado largas').optional().nullable(),
+  isActive: z.boolean().optional().default(true),
+})
+
+// Sin default de isActive en el PUT: omitirlo no debe reactivar un plan desactivado
+export const CardInstallmentPlanUpdateSchema = CardInstallmentPlanSchema.extend({
+  isActive: z.boolean().optional(),
+}).partial()
+
 // ─── Savings ───────────────────────────────────────────────────────────────
 
 export const SavingsGoalSchema = z.object({

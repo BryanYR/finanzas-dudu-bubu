@@ -64,6 +64,8 @@ const cardToPay = ref<{ card: CreditCard; suggestedAmount: number } | null>(null
 const cardForHistory = ref<{ id: number; name: string } | null>(null)
 const showStatementsModal = ref(false)
 const cardForStatements = ref<CreditCard | null>(null)
+const showInstallmentsModal = ref(false)
+const cardForInstallments = ref<CreditCard | null>(null)
 const filterActive = ref<'all' | 'active' | 'inactive'>('all')
 const confirm = useConfirm()
 
@@ -128,6 +130,10 @@ const openPaymentModal = (card: CreditCard, amount: number) => {
 const openStatementsModal = (card: CreditCard) => {
   cardForStatements.value = card
   showStatementsModal.value = true
+}
+const openInstallmentsModal = (card: CreditCard) => {
+  cardForInstallments.value = card
+  showInstallmentsModal.value = true
 }
 const openPaymentHistoryModal = (card: CreditCard) => {
   cardForHistory.value = { id: card.id, name: card.name }
@@ -317,6 +323,21 @@ const usageBarClass = (pct: number) => {
                       d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                     />
                   </svg>
+                </button>
+                <button
+                  @click="openInstallmentsModal(card)"
+                  class="flex h-8 items-center justify-center gap-1 rounded-lg bg-white/20 px-2 text-xs font-medium text-white transition hover:bg-white/30"
+                  title="Planes de cuotas"
+                >
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M4 6h16M4 10h16M4 14h10M4 18h6"
+                    />
+                  </svg>
+                  <span class="hidden sm:inline">Cuotas</span>
                 </button>
                 <button
                   @click="openPaymentHistoryModal(card)"
@@ -671,6 +692,11 @@ const usageBarClass = (pct: number) => {
       v-model:show="showStatementsModal"
       :card="cardForStatements"
       @change="loadStatements"
+    />
+
+    <TarjetasCardInstallmentsModal
+      v-model:show="showInstallmentsModal"
+      :card="cardForInstallments"
     />
 
     <TarjetasCardPaymentHistoryModal

@@ -18,14 +18,15 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relaciones
-  categories        Category[]
-  incomes           Income[]
-  expenses          Expense[]
-  creditCards       CreditCard[]
-  cardStatements    CreditCardStatement[]
-  savingsGoals      SavingsGoal[]
-  debts             Debt[]
-  budgetProjections BudgetProjection[]
+  categories           Category[]
+  incomes              Income[]
+  expenses             Expense[]
+  creditCards          CreditCard[]
+  cardStatements       CreditCardStatement[]
+  cardInstallmentPlans CardInstallmentPlan[]
+  savingsGoals         SavingsGoal[]
+  debts                Debt[]
+  budgetProjections    BudgetProjection[]
 
   @@index([role])
 }
@@ -118,9 +119,10 @@ model CreditCard {
   isActive        Boolean @default(true)
   userId          Int
 
-  user       User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expenses   Expense[]
-  statements CreditCardStatement[] // Recibos mensuales (monto a pagar por vencimiento)
+  user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expenses         Expense[]
+  statements       CreditCardStatement[] // Recibos mensuales (monto a pagar por vencimiento)
+  installmentPlans CardInstallmentPlan[] // Cuotas en curso (compras en cuotas, traslados de saldo, conversiones)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -151,6 +153,33 @@ model CreditCardStatement {
   updatedAt DateTime @updatedAt
 
   @@index([creditCardId, isPaid, dueDate])
+  @@index([userId])
+}
+
+// ========== PLANES DE CUOTAS DE TARJETA ==========
+// Cronograma de una cuota ya comprometida en la tarjeta (compra en cuotas, traslado de
+// saldo, conversión a cuotas). La cuota N vence en firstDueDate + (N-1) meses; la cuota
+// "actual" no se guarda, se calcula con la fecha (ver cardInstallmentPlanService).
+model CardInstallmentPlan {
+  id                Int      @id @default(autoincrement())
+  description       String // Ej: "Falabella.com 14/06", "Traslado de saldo crédito efectivo"
+  totalInstallments Int
+  installmentAmount Decimal  @db.Decimal(12, 2) // Cuota mensual (capital + interés)
+  firstDueDate      DateTime // Vencimiento del recibo que trae la cuota 1
+  principal         Decimal? @db.Decimal(12, 2) // Monto financiado (informativo)
+  interestRate      Float? // TEA (informativo)
+  notes             String?
+  isActive          Boolean  @default(true)
+  creditCardId      Int
+  userId            Int
+
+  creditCard CreditCard @relation(fields: [creditCardId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([creditCardId, isActive])
   @@index([userId])
 }
 

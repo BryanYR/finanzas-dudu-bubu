@@ -54,6 +54,62 @@ export interface CardBill {
   creditCardId: number
 }
 
+/** Plan de cuotas vigente de una tarjeta (CardInstallmentPlan) con los campos calculados por la API */
+export interface CardInstallmentPlan {
+  id: number
+  description: string
+  totalInstallments: number
+  /** Cuota mensual (capital + interés) */
+  installmentAmount: number
+  /** Vencimiento del recibo que trae la cuota 1 */
+  firstDueDate: string
+  principal: number | null
+  interestRate: number | null
+  notes: string | null
+  isActive: boolean
+  creditCardId: number
+  /** Cuota que vence en el próximo recibo */
+  currentInstallment: number
+  remainingInstallments: number
+  lastDueDate: string
+  remainingAmount: number
+}
+
+export interface CardInstallmentProjectionItem {
+  planId: number
+  description: string
+  installmentNumber: number
+  totalInstallments: number
+  amount: number
+}
+
+/** Cuotas que vencen en un mes; `statementAmount` es el recibo ya cargado para ese vencimiento */
+export interface CardInstallmentProjectionMonth {
+  /** YYYY-MM */
+  month: string
+  dueDate: string
+  total: number
+  items: CardInstallmentProjectionItem[]
+  statementAmount: number | null
+}
+
+export interface CardInstallmentsResponse {
+  plans: CardInstallmentPlan[]
+  projection: CardInstallmentProjectionMonth[]
+}
+
+/** Body de POST / PUT de /api/credit-cards/[id]/installment-plans */
+export interface CardInstallmentPlanInput {
+  description: string
+  totalInstallments: number
+  installmentAmount: number
+  firstDueDate: string
+  principal?: number | null
+  interestRate?: number | null
+  notes?: string | null
+  isActive?: boolean
+}
+
 export interface CardPayment {
   id: number
   amount: number

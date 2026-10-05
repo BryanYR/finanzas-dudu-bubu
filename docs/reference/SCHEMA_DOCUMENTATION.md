@@ -59,6 +59,7 @@ Categorización de ingresos y gastos, con icono/color para la UI.
 - `isActive: Boolean @default(true)`.
 - `expenses: Expense[]` — relación inversa; el borrado de la tarjeta no borra los gastos (ver `Expense.creditCardId` arriba).
 - `statements: CreditCardStatement[]` — recibos mensuales.
+- `installmentPlans: CardInstallmentPlan[]` — cuotas en curso (ver 5c).
 - Índice: `@@index([userId, isActive])`.
 
 ### 5b. `CreditCardStatement`
@@ -69,6 +70,15 @@ Categorización de ingresos y gastos, con icono/color para la UI.
 - Pagos parciales no modelados: el recibo se marca pagado con el `paidAmount` real.
 - `creditCardId` → `CreditCard` y `userId` → `User`, ambos `onDelete: Cascade`.
 - Índices: `@@index([creditCardId, isPaid, dueDate])`, `@@index([userId])`.
+
+### 5c. `CardInstallmentPlan`
+
+- Cronograma de una cuota ya comprometida en una tarjeta (compra en cuotas, traslado de saldo, conversión a cuotas): `description`, `totalInstallments`, `installmentAmount` (cuota mensual, capital + interés), `firstDueDate` (vencimiento del recibo que trae la cuota 1), `principal?` (monto financiado, informativo), `interestRate?` (TEA en %, informativo), `notes?`, `isActive`.
+- Existe porque `CreditCardStatement` solo guarda el total de cada recibo y `Expense.installments` solo cuenta la cuota del ciclo en que se compró; no hay forma de saber cuánto de cuotas se paga en cada mes futuro ni cuándo termina cada una.
+- La cuota N vence en `firstDueDate + (N-1)` meses (mismo día, acotado a fin de mes). **No se guarda la cuota actual**: se calcula con la fecha en `cardInstallmentPlanService` (`currentInstallment`, `remainingInstallments`, `lastDueDate`, `remainingAmount` y la proyección mensual). Los vencimientos se guardan a mediodía Lima (17:00Z), igual que `CreditCardStatement.dueDate`.
+- No genera ni modifica `CreditCardStatement`: los recibos siguen siendo los montos que carga el usuario. Los planes terminados no se cargan.
+- `creditCardId` → `CreditCard` y `userId` → `User`, ambos `onDelete: Cascade`.
+- Índices: `@@index([creditCardId, isActive])`, `@@index([userId])`.
 
 ### 6. `SavingsGoal`
 
@@ -143,6 +153,8 @@ Planificador "qué pasaría si" independiente (viajes, compras grandes) — **no
 | `CreditCard` → `User`                 | Cascade      | —                                                                       |
 | `CreditCardStatement` → `CreditCard`  | Cascade      | Borrar la tarjeta borra sus recibos mensuales                           |
 | `CreditCardStatement` → `User`        | Cascade      | —                                                                       |
+| `CardInstallmentPlan` → `CreditCard`  | Cascade      | Borrar la tarjeta borra sus planes de cuotas                            |
+| `CardInstallmentPlan` → `User`        | Cascade      | —                                                                       |
 | `SavingsGoal` → `User`                | Cascade      | —                                                                       |
 | `SavingsContribution` → `SavingsGoal` | Cascade      | Borrar la meta borra su historial de aportes                            |
 | `Debt` → `User`                       | Cascade      | —                                                                       |
@@ -175,6 +187,10 @@ Planificador "qué pasaría si" independiente (viajes, compras grandes) — **no
 
 // CreditCardStatement
 @@index([creditCardId, isPaid, dueDate])
+@@index([userId])
+
+// CardInstallmentPlan
+@@index([creditCardId, isActive])
 @@index([userId])
 
 // SavingsGoal
