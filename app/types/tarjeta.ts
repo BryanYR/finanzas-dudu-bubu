@@ -30,7 +30,7 @@ export interface CardStatement {
   newExpensesAmount?: number
   newExpensesCount?: number
   coveredUntil?: string | null
-  /** Uso de la línea: carriedBalance + gastos del periodo (base de creditUsagePercent/availableCredit) */
+  /** Uso de la línea: carriedBalance + todos los gastos sin pagar (base de creditUsagePercent/availableCredit) */
   usedAmount?: number
   periodExpensesAmount: number
   carriedBalance: number

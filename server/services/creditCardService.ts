@@ -157,7 +157,8 @@ export function findNextUnpaidStatement(cardId: number, userId: number) {
  * Monto a pagar de la tarjeta: si hay un CreditCardStatement pendiente, manda su monto
  * y vencimiento (el pago del mes o, si ya se pagó, el siguiente). Si no hay recibos
  * cargados, cae al cálculo por Expense del periodo activo + carriedBalance.
- * `usedAmount` siempre es carriedBalance + gastos del periodo (uso de la línea).
+ * `usedAmount` (uso de la línea) es carriedBalance + TODOS los gastos sin pagar, incluidos
+ * los posteriores al corte, igual que budgets/calculate.post.ts.
  */
 export async function resolveCardAmountDue(
   card: { id: number; carriedBalance: unknown } & CardBillingConfig,
@@ -165,22 +166,18 @@ export async function resolveCardAmountDue(
   today = new Date()
 ) {
   const period = await resolveActiveBillingPeriod(card, userId, today)
-  const expenses = await prisma.expense.findMany({
-    where: {
-      userId,
-      creditCardId: card.id,
-      date: { gte: period.billingStartDate, lte: period.billingEndDate },
-      isPaidOff: false,
-    },
-  })
+  const unpaid = await findUnpaidCardExpenses(card.id, userId)
+  const start = period.billingStartDate.getTime()
+  const end = period.billingEndDate.getTime()
+  const expenses = unpaid.filter((e) => e.date.getTime() >= start && e.date.getTime() <= end)
   // carriedBalance / expense.amount vienen como Prisma.Decimal
   const periodExpensesAmount = expenses.reduce((sum, e) => sum + Number(e.amount), 0)
-  const usedAmount = Number(card.carriedBalance) + periodExpensesAmount
+  const unpaidExpensesAmount = unpaid.reduce((sum, e) => sum + Number(e.amount), 0)
+  const usedAmount = Number(card.carriedBalance) + unpaidExpensesAmount
 
   const statement = await findNextUnpaidStatement(card.id, userId)
   if (statement) {
     const window = billingWindowForDueDate(card, statement.dueDate)
-    const unpaid = await findUnpaidCardExpenses(card.id, userId)
     const due = computeStatementDue(card, statement, unpaid)
     return {
       source: 'statement' as const,

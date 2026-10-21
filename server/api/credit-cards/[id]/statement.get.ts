@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
 
   // amountDue = recibo pendiente más próximo (CreditCardStatement) si hay alguno cargado;
   // si no, carriedBalance + gastos no pagados del periodo activo. usedAmount (uso de la
-  // línea) siempre es carriedBalance + gastos del periodo.
+  // línea) siempre es carriedBalance + todos los gastos sin pagar.
   const due = await resolveCardAmountDue(card, user.id)
 
   // card.creditLimit / card.carriedBalance vienen de la BD como Prisma.Decimal
