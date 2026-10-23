@@ -2,7 +2,7 @@
 import type { CreditCard } from '#types/tarjeta'
 import InfoIcon from '@components/icons/common/InfoIcon.vue'
 
-const { formatCurrency } = useDateFormatter()
+const { formatCurrency, today, toISOString } = useDateFormatter()
 
 const props = defineProps<{
   show: boolean
@@ -23,7 +23,7 @@ const localShow = computed({
 // Form state
 const form = reactive({
   amount: 0,
-  date: new Date().toISOString().split('T')[0],
+  date: today(),
   categoryId: null as number | null,
 })
 
@@ -50,7 +50,7 @@ watch(
   (newVal) => {
     if (newVal) {
       form.amount = props.suggestedAmount || 0
-      form.date = new Date().toISOString().split('T')[0]
+      form.date = today()
       form.categoryId =
         paymentCategories.value.find((c) => c.name.toLowerCase().includes('tarjeta'))?.id ||
         paymentCategories.value[0]?.id ||
@@ -81,7 +81,7 @@ const handleSubmit = async () => {
       method: 'POST',
       body: {
         amount: form.amount,
-        date: form.date,
+        date: toISOString(form.date),
         categoryId: form.categoryId,
       },
     })
