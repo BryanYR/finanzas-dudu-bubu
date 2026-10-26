@@ -234,6 +234,12 @@ const dueDateLabel = (dateStr: string) => {
             </div>
 
             <div class="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+              <div class="col-span-2">
+                <p class="text-xs text-white/60">Sobrante del ciclo anterior</p>
+                <p class="font-bold" :class="currentCycle.carryOver < 0 ? 'text-red-200' : ''">
+                  {{ formatCurrency(currentCycle.carryOver) }}
+                </p>
+              </div>
               <div>
                 <p class="text-xs text-white/60">Entró desde el sueldo</p>
                 <p class="font-bold">{{ formatCurrency(currentCycle.income) }}</p>

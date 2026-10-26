@@ -6,6 +6,7 @@ import {
   resolveActiveBillingPeriod,
 } from './creditCardService'
 import { isMonthSkipped } from '@server/utils/frequency'
+import type { Prisma } from '@prisma/client'
 import type {
   PaymentSuggestion,
   CashFlowDay,
@@ -32,6 +33,8 @@ const DAY_MS = 24 * 60 * 60 * 1000
 const LIMA_OFFSET_MS = 5 * 60 * 60 * 1000
 /** Si el último sueldo registrado es más viejo que esto, se asume el día teórico de sueldo. */
 const MAX_SALARY_AGE_DAYS = 40
+/** Un ingreso manual de la categoría del sueldo cuenta como sueldo si llega a este % de la plantilla. */
+const SALARY_MATCH_RATIO = 0.8
 
 type Priority = 'urgent' | 'high' | 'medium' | 'low'
 const PRIORITY_ORDER: Record<Priority, number> = { urgent: 0, high: 1, medium: 2, low: 3 }
@@ -119,17 +122,25 @@ export async function getPaymentSuggestions(userId: number) {
 
   let cycleStart: number
   let salaryDayOfMonth: number | null = null
+  let salaryWhere: Prisma.IncomeWhereInput | null = null
   if (salaryTemplate) {
     salaryDayOfMonth = new Date(dayOf(salaryTemplate.date)).getUTCDate()
+    // Un sueldo registrado a mano (p. ej. adelantado) cuenta si es de la misma categoría
+    // y de un monto parecido a la plantilla, aunque no venga del botón de recurrentes.
+    salaryWhere = {
+      userId,
+      OR: [
+        { id: salaryTemplate.id },
+        { notes: { contains: `recurrente #${salaryTemplate.id}` } },
+        {
+          isRecurring: false,
+          categoryId: salaryTemplate.categoryId,
+          amount: { gte: Number(salaryTemplate.amount) * SALARY_MATCH_RATIO },
+        },
+      ],
+    }
     const lastReceived = await prisma.income.findFirst({
-      where: {
-        userId,
-        date: { lte: now },
-        OR: [
-          { id: salaryTemplate.id },
-          { notes: { contains: `recurrente #${salaryTemplate.id}` } },
-        ],
-      },
+      where: { ...salaryWhere, date: { lte: now } },
       orderBy: { date: 'desc' },
     })
     const lastDay = lastReceived ? dayOf(lastReceived.date) : null
@@ -153,27 +164,47 @@ export async function getPaymentSuggestions(userId: number) {
   const cycleAfterNext = dayInMonth(cs.getUTCFullYear(), cs.getUTCMonth() + 2, nextDay)
   const salaryOverdue = !!salaryTemplate && today >= nextSalary
 
+  // Ciclo anterior: desde el sueldo previo (o su día teórico) hasta el inicio del actual.
+  let prevCycleStart = dayInMonth(cs.getUTCFullYear(), cs.getUTCMonth() - 1, nextDay)
+  if (salaryWhere) {
+    const prevReceived = await prisma.income.findFirst({
+      where: { ...salaryWhere, date: { lt: new Date(cycleStart) } },
+      orderBy: { date: 'desc' },
+    })
+    const prevDay = prevReceived ? dayOf(prevReceived.date) : null
+    if (prevDay !== null && (cycleStart - prevDay) / DAY_MS <= MAX_SALARY_AGE_DAYS) {
+      prevCycleStart = prevDay
+    }
+  }
+
   const cycleOf = (dueDay: number): 'current' | 'next' | null =>
     dueDay < nextSalary ? 'current' : dueDay < cycleAfterNext ? 'next' : null
 
   // ── 2. Movimientos del ciclo actual (lo que ya entró / ya se pagó) ─────────
   const cycleStartDate = new Date(cycleStart)
   const horizonDate = new Date(cycleAfterNext)
-  const [incomesInCycle, cashExpensesInCycle, debtPaymentsInCycle] = await Promise.all([
-    prisma.income.findMany({ where: { userId, date: { gte: cycleStartDate, lte: now } } }),
-    // Gastos con tarjeta no salen del débito ahora: se pagan con el recibo.
-    prisma.expense.findMany({
-      where: { userId, creditCardId: null, date: { gte: cycleStartDate, lte: now } },
-    }),
-    prisma.debtPayment.findMany({
-      where: { debt: { userId }, date: { gte: cycleStartDate, lte: now } },
-    }),
+  /** Ingresos y salidas de caja (gastos sin tarjeta + cuotas pagadas) en el rango de fechas. */
+  const cashMovements = async (date: Prisma.DateTimeFilter) => {
+    const [incomes, cashExpenses, debtPayments] = await Promise.all([
+      prisma.income.findMany({ where: { userId, date } }),
+      // Gastos con tarjeta no salen del débito ahora: se pagan con el recibo.
+      prisma.expense.findMany({ where: { userId, creditCardId: null, date } }),
+      prisma.debtPayment.findMany({ where: { debt: { userId }, date } }),
+    ])
+    return {
+      received: incomes.reduce((sum, i) => sum + Number(i.amount), 0),
+      spent:
+        cashExpenses.reduce((sum, e) => sum + Number(e.amount), 0) +
+        debtPayments.reduce((sum, p) => sum + Number(p.amount), 0),
+    }
+  }
+  const [{ received, spent }, prev] = await Promise.all([
+    cashMovements({ gte: cycleStartDate, lte: now }),
+    cashMovements({ gte: new Date(prevCycleStart), lt: cycleStartDate }),
   ])
-  const received = incomesInCycle.reduce((sum, i) => sum + Number(i.amount), 0)
-  const spent =
-    cashExpensesInCycle.reduce((sum, e) => sum + Number(e.amount), 0) +
-    debtPaymentsInCycle.reduce((sum, p) => sum + Number(p.amount), 0)
-  const available = received - spent
+  // Lo que sobró (o faltó) del ciclo anterior sigue en la cuenta.
+  const carryOver = prev.received - prev.spent
+  const available = carryOver + received - spent
 
   // ── 3. Obligaciones hasta el fin del próximo ciclo ─────────────────────────
   const suggestions: PaymentSuggestion[] = []
@@ -367,12 +398,12 @@ export async function getPaymentSuggestions(userId: number) {
     endDate: toISODay(nextSalary),
     income: received,
     spent,
-    carryOver: 0,
+    carryOver,
     available,
     obligationsTotal: currentObligations,
     obligationsCount: suggestions.filter((s) => s.cycle === 'current').length,
     result: currentResult,
-    resultWithoutCarry: currentResult,
+    resultWithoutCarry: currentResult - carryOver,
     status: statusFor(currentResult, safetyBuffer),
   }
 

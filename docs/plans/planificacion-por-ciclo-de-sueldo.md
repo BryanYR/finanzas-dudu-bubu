@@ -16,9 +16,10 @@ El sueldo que entra a fin del mes M paga lo que vence hasta el siguiente sueldo 
 
 **Ciclo** = `[fecha de sueldo k, fecha de sueldo k+1)`.
 
-- Ancla: la plantilla de ingreso recurrente mensual de mayor monto. El inicio del ciclo actual es la fecha (día) del último sueldo recibido de esa plantilla (la propia plantilla o un ingreso con `notes` "…recurrente #<id>"). Si no hay uno en los últimos 40 días, se usa la última ocurrencia teórica del día de sueldo. Sin ingresos recurrentes → mes calendario.
+- Ancla: la plantilla de ingreso recurrente mensual de mayor monto. El inicio del ciclo actual es la fecha (día) del último sueldo recibido de esa plantilla (la propia plantilla, un ingreso con `notes` "…recurrente #<id>", o un ingreso manual no recurrente de la misma categoría con monto ≥ 80% de la plantilla — p. ej. un sueldo adelantado). Si no hay uno en los últimos 40 días, se usa la última ocurrencia teórica del día de sueldo. Sin ingresos recurrentes → mes calendario.
 - **Ciclo actual** `[L, N)`:
-  - Disponible = ingresos en `[L, hoy]` (incluye préstamos recibidos) − gastos sin tarjeta en `[L, hoy]` − `DebtPayment` en `[L, hoy]`.
+  - Sobrante del ciclo anterior = ingresos − gastos sin tarjeta − `DebtPayment` en `[L_prev, L)`, con `L_prev` = sueldo previo (mismo criterio, ≤ 40 días antes de `L`) o su día teórico. Solo se arrastra un ciclo.
+  - Disponible = sobrante anterior + ingresos en `[L, hoy]` (incluye préstamos recibidos) − gastos sin tarjeta en `[L, hoy]` − `DebtPayment` en `[L, hoy]`.
   - Pendiente = obligaciones no pagadas con vencimiento `< N` (incluye vencidas).
   - Queda = disponible − pendiente.
 - **Próximo ciclo** `[N, N2)`:

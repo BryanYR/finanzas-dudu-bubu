@@ -37,7 +37,7 @@ export interface PaymentCycle {
   income: number
   /** Ciclo actual: gastos sin tarjeta + cuotas pagadas desde el sueldo. Próximo: 0. */
   spent: number
-  /** Lo que sobra (o falta) del ciclo anterior. Ciclo actual: 0. */
+  /** Lo que sobra (o falta) del ciclo anterior: ingresos − gastos sin tarjeta − cuotas pagadas en él. */
   carryOver: number
   /** carryOver + income - spent */
   available: number

@@ -20,13 +20,18 @@ export async function generateRecurringIncomes(userId: number) {
   const skipped = []
 
   for (const recurring of recurringIncomes) {
+    // Ya generado este mes, o registrado a mano (misma categoría y monto parecido,
+    // p. ej. un sueldo adelantado): no duplicar.
     const existing = await prisma.income.findFirst({
       where: {
         userId,
-        amount: recurring.amount,
-        description: recurring.description,
         categoryId: recurring.categoryId,
         date: { gte: monthStart, lte: monthEnd },
+        OR: [
+          { id: recurring.id },
+          { notes: { contains: `recurrente #${recurring.id}` } },
+          { isRecurring: false, amount: { gte: Number(recurring.amount) * 0.8 } },
+        ],
       },
     })
 
